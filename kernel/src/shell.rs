@@ -170,9 +170,7 @@ fn kernel_command(console: &mut Console<'_>, cwd: &str, args: &str) {
         kernel_status(console);
     } else if subcommand.eq_ignore_ascii_case("version") {
         let _ = writeln!(console, "Generic OS kernel 0.1.0 x86_64");
-    } else if subcommand.eq_ignore_ascii_case("memory")
-        || subcommand.eq_ignore_ascii_case("mem")
-    {
+    } else if subcommand.eq_ignore_ascii_case("memory") || subcommand.eq_ignore_ascii_case("mem") {
         memory(console);
     } else if subcommand.eq_ignore_ascii_case("video") {
         video(console);
@@ -183,8 +181,7 @@ fn kernel_command(console: &mut Console<'_>, cwd: &str, args: &str) {
     } else if subcommand.eq_ignore_ascii_case("reboot") {
         let _ = writeln!(console, "Rebooting...");
         crate::arch::reboot();
-    } else if subcommand.eq_ignore_ascii_case("halt")
-        || subcommand.eq_ignore_ascii_case("shutdown")
+    } else if subcommand.eq_ignore_ascii_case("halt") || subcommand.eq_ignore_ascii_case("shutdown")
     {
         let _ = writeln!(console, "CPU halted.");
         crate::arch::halt();
@@ -349,7 +346,10 @@ fn font(console: &mut Console<'_>, cwd: &str, args: &str) {
         return;
     }
 
-    let _ = writeln!(console, "font: expected LIST, SET, LOAD, CURRENT or RESET\nUse KERNEL FONT HELP via KERNEL HELP.");
+    let _ = writeln!(
+        console,
+        "font: expected LIST, SET, LOAD, CURRENT or RESET\nUse KERNEL HELP."
+    );
 }
 
 fn print_font(console: &mut Console<'_>) {
