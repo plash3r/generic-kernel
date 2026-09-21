@@ -32,7 +32,7 @@ The x86_64 path provides a no_std Rust kernel with:
 - block-device abstraction, legacy virtio-blk PCI driver and PMM-backed DMA;
 - persistent GenericFS volume mounted at /mnt when storage is attached;
 - interactive file commands: cd/ls/cat/touch/mkdir/write/append/rm/stat/mounts;
-- centralized KERNEL system command with status/control/settings subcommands;
+- centralized KERNEL system command with status/diagnostics/control/settings subcommands;
 - runtime font management under KERNEL FONT, including custom PSF2 loading;
 - freestanding Recontrol ABI integration;
 - hybrid ISO and disk boot smoke tests.
@@ -95,6 +95,7 @@ The kernel console uses one primary system namespace:
 
     kernel help
     kernel status
+    kernel diagnostics
     kernel memory
     kernel video
     kernel font list

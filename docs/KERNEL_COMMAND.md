@@ -9,6 +9,7 @@ command tree instead of being spread across unrelated top-level commands.
     kernel
     kernel help
     kernel status
+    kernel diagnostics
     kernel version
     kernel memory
     kernel video
@@ -30,6 +31,19 @@ prints a compact combined view of:
 - active console font and glyph size;
 - physical-memory and heap availability;
 - mounted filesystems.
+
+### Diagnostics
+
+    kernel diagnostics
+
+runs non-destructive runtime self-checks across the active kernel. The command
+checks PMM/heap accounting, the live CR3 and supervisor write-protect bit, heap
+mapping and guard pages, framebuffer/font geometry, VFS/initramfs access,
+GenericFS persistence when mounted, and the Recontrol freestanding ABI.
+
+Each check is reported as `[ok]`, `[warn]` or `[fail]`, followed by a
+summary. A missing optional persistent GenericFS mount is a warning rather than
+a failure. `kernel diag` is accepted as a short alias.
 
 ### Font settings
 

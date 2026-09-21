@@ -122,6 +122,15 @@ pub fn init(info: &BootInfo) {
     *global = Some(pmm);
 }
 
+pub fn runtime_diagnostics() -> Option<crate::arch::memory::RuntimeMemoryDiagnostics> {
+    let offset = (*PHYSICAL_MEMORY_OFFSET.lock())?;
+    Some(crate::arch::memory::runtime_diagnostics(
+        offset,
+        HEAP_START,
+        HEAP_SIZE,
+    ))
+}
+
 pub fn stats() -> MemoryStats {
     let physical = PHYSICAL_MEMORY.lock();
     let Some(pmm) = physical.as_ref() else {

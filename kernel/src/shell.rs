@@ -3,7 +3,7 @@ use crate::arch::{
     keyboard::{Key, Keyboard},
 };
 use alloc::string::String;
-use core::fmt::Write;
+use core::fmt::{self, Write};
 use kernel_core::vfs::NodeKind;
 
 const MAX_LINE: usize = 256;
@@ -168,6 +168,10 @@ fn kernel_command(console: &mut Console<'_>, cwd: &str, args: &str) {
 
     if subcommand.eq_ignore_ascii_case("status") {
         kernel_status(console);
+    } else if subcommand.eq_ignore_ascii_case("diagnostics")
+        || subcommand.eq_ignore_ascii_case("diag")
+    {
+        kernel_diagnostics(console);
     } else if subcommand.eq_ignore_ascii_case("version") {
         let _ = writeln!(console, "Generic OS kernel 0.1.0 x86_64");
     } else if subcommand.eq_ignore_ascii_case("memory") || subcommand.eq_ignore_ascii_case("mem") {
@@ -197,6 +201,7 @@ fn kernel_help(console: &mut Console<'_>) {
     let _ = writeln!(console);
     let _ = writeln!(console, "  HELP                 show kernel command help");
     let _ = writeln!(console, "  STATUS               combined kernel status");
+    let _ = writeln!(console, "  DIAGNOSTICS          run kernel self-checks");
     let _ = writeln!(console, "  VERSION              kernel version");
     let _ = writeln!(console, "  MEMORY               physical memory and heap");
     let _ = writeln!(console, "  VIDEO                framebuffer information");
@@ -210,6 +215,7 @@ fn kernel_help(console: &mut Console<'_>) {
     let _ = writeln!(console);
     let _ = writeln!(console, "Examples:");
     let _ = writeln!(console, "  KERNEL STATUS");
+    let _ = writeln!(console, "  KERNEL DIAGNOSTICS");
     let _ = writeln!(console, "  KERNEL FONT LIST");
     let _ = writeln!(console, "  KERNEL FONT SET noto20");
     let _ = writeln!(console, "  KERNEL FONT LOAD /mnt/fonts/custom.psf");
@@ -246,6 +252,223 @@ fn kernel_status(console: &mut Console<'_>) {
     let _ = writeln!(console, "Mounts: {}", mounts.len());
     for mount in mounts {
         let _ = writeln!(console, "  {} on {}", mount.filesystem, mount.path);
+    }
+}
+
+
+#[derive(Default)]
+struct DiagnosticSummary {
+    passed: usize,
+    warnings: usize,
+    failed: usize,
+}
+
+impl DiagnosticSummary {
+    fn ok(&mut self, console: &mut Console<'_>, message: fmt::Arguments<'_>) {
+        self.passed += 1;
+        let _ = write!(console, "[ok] ");
+        let _ = console.write_fmt(message);
+        let _ = writeln!(console);
+    }
+
+    fn warn(&mut self, console: &mut Console<'_>, message: fmt::Arguments<'_>) {
+        self.warnings += 1;
+        let _ = write!(console, "[warn] ");
+        let _ = console.write_fmt(message);
+        let _ = writeln!(console);
+    }
+
+    fn fail(&mut self, console: &mut Console<'_>, message: fmt::Arguments<'_>) {
+        self.failed += 1;
+        let _ = write!(console, "[fail] ");
+        let _ = console.write_fmt(message);
+        let _ = writeln!(console);
+    }
+}
+
+fn kernel_diagnostics(console: &mut Console<'_>) {
+    let mut summary = DiagnosticSummary::default();
+    let _ = writeln!(console, "Generic kernel diagnostics");
+    let _ = writeln!(console, "Running non-destructive runtime checks...");
+    let _ = writeln!(console);
+
+    let stats = crate::mm::stats();
+    if stats.physical_total > 0
+        && stats.physical_free <= stats.physical_total
+        && stats.managed_regions > 0
+        && stats.heap_total > 0
+        && stats.heap_free <= stats.heap_total
+    {
+        summary.ok(
+            console,
+            format_args!(
+                "memory accounting: {} MiB free / {} MiB, heap {} KiB free / {} KiB",
+                stats.physical_free / (1024 * 1024),
+                stats.physical_total / (1024 * 1024),
+                stats.heap_free / 1024,
+                stats.heap_total / 1024
+            ),
+        );
+    } else {
+        summary.fail(console, format_args!("memory accounting is inconsistent"));
+    }
+
+    match crate::mm::runtime_diagnostics() {
+        Some(memory) => {
+            if memory.cr3 != 0 && memory.write_protect {
+                summary.ok(
+                    console,
+                    format_args!("MMU: CR3={:#x}, supervisor write-protect enabled", memory.cr3),
+                );
+            } else {
+                summary.fail(
+                    console,
+                    format_args!(
+                        "MMU state invalid: CR3={:#x}, write-protect={}",
+                        memory.cr3, memory.write_protect
+                    ),
+                );
+            }
+
+            if memory.heap_start_mapped
+                && memory.heap_end_mapped
+                && memory.lower_guard_unmapped
+                && memory.upper_guard_unmapped
+            {
+                summary.ok(
+                    console,
+                    format_args!("heap mapping present with both guard pages unmapped"),
+                );
+            } else {
+                summary.fail(
+                    console,
+                    format_args!(
+                        "heap layout invalid: start={} end={} lower-guard={} upper-guard={}",
+                        memory.heap_start_mapped,
+                        memory.heap_end_mapped,
+                        memory.lower_guard_unmapped,
+                        memory.upper_guard_unmapped
+                    ),
+                );
+            }
+        }
+        None => summary.fail(console, format_args!("MMU diagnostics unavailable")),
+    }
+
+    let (font_width, font_height) = console.font_dimensions();
+    if console.width() > 0
+        && console.height() > 0
+        && console.columns() > 0
+        && console.rows() > 0
+        && font_width > 0
+        && font_height > 0
+    {
+        summary.ok(
+            console,
+            format_args!(
+                "framebuffer {}x{}, terminal {}x{}, font {} {}x{}",
+                console.width(),
+                console.height(),
+                console.columns(),
+                console.rows(),
+                console.font_name(),
+                font_width,
+                font_height
+            ),
+        );
+    } else {
+        summary.fail(console, format_args!("framebuffer or terminal geometry is invalid"));
+    }
+
+    match crate::vfs::metadata("/") {
+        Ok(metadata) if metadata.kind == NodeKind::Directory => {
+            summary.ok(console, format_args!("VFS root is mounted and accessible"));
+        }
+        Ok(_) => summary.fail(console, format_args!("VFS root is not a directory")),
+        Err(error) => summary.fail(console, format_args!("VFS root lookup failed: {error}")),
+    }
+
+    match crate::vfs::read_file("/etc/issue") {
+        Ok(data) if !data.is_empty() => {
+            summary.ok(
+                console,
+                format_args!("initramfs content readable: /etc/issue ({} bytes)", data.len()),
+            );
+        }
+        Ok(_) => summary.warn(console, format_args!("/etc/issue is empty")),
+        Err(error) => summary.fail(
+            console,
+            format_args!("initramfs read failed for /etc/issue: {error}"),
+        ),
+    }
+
+    let mounts = crate::vfs::mounts();
+    if mounts
+        .iter()
+        .any(|mount| mount.path == "/" && mount.filesystem == "ramfs")
+    {
+        summary.ok(
+            console,
+            format_args!("root filesystem: ramfs ({} mount(s) total)", mounts.len()),
+        );
+    } else {
+        summary.fail(console, format_args!("expected ramfs root mount is missing"));
+    }
+
+    if mounts
+        .iter()
+        .any(|mount| mount.path == "/mnt" && mount.filesystem == "genericfs")
+    {
+        match crate::vfs::read_file("/mnt/.generic-persist") {
+            Ok(marker) if marker == b"generic-persistent-v1" => {
+                summary.ok(
+                    console,
+                    format_args!("GenericFS persistent volume marker verified"),
+                );
+            }
+            Ok(_) => summary.fail(
+                console,
+                format_args!("GenericFS persistent marker is corrupted"),
+            ),
+            Err(error) => summary.fail(
+                console,
+                format_args!("GenericFS persistent marker read failed: {error}"),
+            ),
+        }
+    } else {
+        summary.warn(
+            console,
+            format_args!("persistent GenericFS is not mounted at /mnt"),
+        );
+    }
+
+    let recontrol = crate::recontrol::probe();
+    if recontrol == 128 {
+        summary.ok(
+            console,
+            format_args!("Recontrol freestanding ABI probe returned {recontrol}"),
+        );
+    } else {
+        summary.fail(
+            console,
+            format_args!("Recontrol ABI probe returned unexpected value {recontrol}"),
+        );
+    }
+
+    let _ = writeln!(console);
+    let _ = writeln!(
+        console,
+        "Diagnostics: {} passed, {} warning(s), {} failed",
+        summary.passed, summary.warnings, summary.failed
+    );
+    if summary.failed == 0 {
+        if summary.warnings == 0 {
+            let _ = writeln!(console, "Result: all checked subsystems healthy");
+        } else {
+            let _ = writeln!(console, "Result: checked subsystems operational with warnings");
+        }
+    } else {
+        let _ = writeln!(console, "Result: one or more checked subsystems failed");
     }
 }
 

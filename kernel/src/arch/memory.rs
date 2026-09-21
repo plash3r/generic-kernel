@@ -94,6 +94,46 @@ pub fn take_ownership<const N: usize>(offset: u64, pmm: &mut PhysicalMemory<N>) 
     );
 }
 
+
+#[derive(Clone, Copy, Debug)]
+pub struct RuntimeMemoryDiagnostics {
+    pub cr3: u64,
+    pub write_protect: bool,
+    pub heap_start_mapped: bool,
+    pub heap_end_mapped: bool,
+    pub lower_guard_unmapped: bool,
+    pub upper_guard_unmapped: bool,
+}
+
+pub fn runtime_diagnostics(
+    physical_memory_offset: u64,
+    heap_start: u64,
+    heap_size: u64,
+) -> RuntimeMemoryDiagnostics {
+    let heap_end = heap_start.saturating_add(heap_size);
+    let lower_guard = heap_start.saturating_sub(PAGE_SIZE);
+    let upper_guard = heap_end;
+    let last_heap_page = heap_end.saturating_sub(PAGE_SIZE);
+
+    let mapper = unsafe { current_offset_page_table(VirtAddr::new(physical_memory_offset)) };
+    let (root, _) = Cr3::read();
+
+    RuntimeMemoryDiagnostics {
+        cr3: root.start_address().as_u64(),
+        write_protect: Cr0::read().contains(Cr0Flags::WRITE_PROTECT),
+        heap_start_mapped: mapper.translate_addr(VirtAddr::new(heap_start)).is_some(),
+        heap_end_mapped: mapper
+            .translate_addr(VirtAddr::new(last_heap_page))
+            .is_some(),
+        lower_guard_unmapped: mapper
+            .translate_addr(VirtAddr::new(lower_guard))
+            .is_none(),
+        upper_guard_unmapped: mapper
+            .translate_addr(VirtAddr::new(upper_guard))
+            .is_none(),
+    }
+}
+
 pub struct HeapMapping {
     pub mapped_pages: u64,
     pub page_table_and_heap_frames: u64,
