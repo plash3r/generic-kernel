@@ -81,6 +81,10 @@ pub fn init(info: &BootInfo) {
 
     verify_physical_memory(physical_memory_offset, &mut pmm);
 
+    // Clone and activate a fully owned table tree before adding mappings.
+    // The bootloader's page-table frames remain reserved, never freed to PMM.
+    crate::arch::memory::take_ownership(physical_memory_offset, &mut pmm);
+
     let before_heap = pmm.free_bytes();
     let mapping =
         crate::arch::memory::map_heap(physical_memory_offset, &mut pmm, HEAP_START, HEAP_SIZE);

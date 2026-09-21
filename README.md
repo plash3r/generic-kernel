@@ -20,6 +20,7 @@ The x86_64 path provides a no_std Rust kernel with:
 - GDT/TSS/IDT and selected exception handlers;
 - permanent physical-memory management with page allocation, free and
   coalescing;
+- Generic-owned four-level page tables and CR3, with supervisor write protection;
 - x86_64 page-table mapping for kernel-owned virtual ranges;
 - a mapped 2 MiB kernel heap that is writable, non-executable and surrounded by
   unmapped guard pages;
@@ -154,7 +155,9 @@ checks that the generated LLVM IR is reproducible.
 Generic now has executable boot paths, a permanent PMM and an early protected
 kernel heap, but it is not yet a complete general-purpose desktop/server OS.
 
-The protected-memory stage still needs Generic-owned top-level page tables,
-full kernel-section W^X enforcement and richer fault coverage. Later stages add
+Generic now deep-copies the loader page-table tree into PMM-owned frames before
+mapping its heap. See docs/MEMORY.md for the handoff contract and tests.
+The protected-memory stage still needs full kernel-section W^X enforcement and
+richer fault coverage. Later stages add
 APIC/IOAPIC and timekeeping, scheduler/SMP, ring 3, syscalls, user ELF loading,
 production-grade storage drivers/filesystem recovery, mature input/graphics drivers and networking.

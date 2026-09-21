@@ -173,6 +173,8 @@ else:
 sys.stdout.buffer.write(output)
 if code != 33 or b"GENERIC: READY" not in output or b"GENERIC: PANIC" in output:
     sys.exit(f"smoke FAILED (QEMU exit={code}); see build/{log_name}")
+if b"[ok] Generic-owned CR3 " not in output:
+    sys.exit(f"page-table ownership smoke FAILED; see build/{log_name}")
 if args.storage and b"GenericFS" not in output:
     sys.exit(f"storage smoke FAILED; see build/{log_name}")
 if args.expect_storage_recovered and b"GenericFS recovered persistent volume" not in output:

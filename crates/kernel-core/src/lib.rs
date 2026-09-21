@@ -7,6 +7,7 @@ extern crate std;
 
 pub mod block;
 pub mod genericfs;
+pub mod page_tables;
 pub mod physical;
 pub mod vfs;
 pub use physical::{PhysicalMemory, PhysicalMemoryError};

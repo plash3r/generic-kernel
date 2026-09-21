@@ -1,12 +1,98 @@
+use kernel_core::page_tables::{clone_root, TableMemory};
 use kernel_core::{PhysicalMemory, PAGE_SIZE};
 use x86_64::{
-    registers::control::Cr3,
+    registers::control::{Cr0, Cr0Flags, Cr3, Cr4, Cr4Flags},
     structures::paging::{
         FrameAllocator as X86FrameAllocator, Mapper, OffsetPageTable, Page, PageTable,
         PageTableFlags, PhysFrame, Size4KiB, Translate,
     },
     PhysAddr, VirtAddr,
 };
+
+struct BootTables<'a, const N: usize> {
+    offset: u64,
+    pmm: &'a mut PhysicalMemory<N>,
+}
+
+impl<const N: usize> BootTables<'_, N> {
+    fn pointer(&self, physical: u64, index: usize) -> *mut u64 {
+        assert!(index < 512);
+        let address = self
+            .offset
+            .checked_add(physical)
+            .expect("table direct-map overflow");
+        // SAFETY: index is within a single 4 KiB table. The boot contract maps
+        // all page-table frames at offset. Only this bootstrap CPU is running.
+        unsafe { VirtAddr::new(address).as_mut_ptr::<u64>().add(index) }
+    }
+}
+
+impl<const N: usize> TableMemory for BootTables<'_, N> {
+    fn allocate(&mut self) -> Option<u64> {
+        let frame = self.pmm.allocate_frame().ok().flatten()?;
+        zero_physical_frame(self.offset, frame);
+        Some(frame)
+    }
+    fn release(&mut self, frame: u64) {
+        self.pmm
+            .free_pages(frame, 1)
+            .expect("table rollback failed");
+    }
+    fn read(&self, frame: u64, index: usize) -> u64 {
+        // SAFETY: the source is the active, bootloader-provided table tree.
+        // Volatile access does not create references aliasing CPU A/D writes.
+        unsafe { self.pointer(frame, index).read_volatile() }
+    }
+    fn write(&mut self, frame: u64, index: usize, entry: u64) {
+        // SAFETY: clone_root writes only exclusively allocated, inactive tables.
+        unsafe { self.pointer(frame, index).write_volatile(entry) }
+    }
+}
+
+/// Bootstrap-only transition; every non-leaf table is now owned by the PMM.
+/// Leaf mappings and permissions remain unchanged, including framebuffer,
+/// kernel stack, descriptor tables and the bootloader physical direct map.
+pub fn take_ownership<const N: usize>(offset: u64, pmm: &mut PhysicalMemory<N>) {
+    assert!(!x86_64::instructions::interrupts::are_enabled());
+    let cr4 = Cr4::read();
+    assert!(
+        !cr4.contains(Cr4Flags::L5_PAGING),
+        "five-level paging is not supported"
+    );
+    assert!(
+        !cr4.contains(Cr4Flags::PCID),
+        "bootstrap PCID is not supported"
+    );
+    let (old_root, cache_flags) = Cr3::read();
+    let before = pmm.free_bytes();
+    let owned = clone_root::<1024>(
+        &mut BootTables { offset, pmm },
+        old_root.start_address().as_u64(),
+    )
+    .expect("cannot acquire Generic page tables");
+    assert_eq!(
+        before - pmm.free_bytes(),
+        owned.table_frames as u64 * PAGE_SIZE
+    );
+    assert_ne!(owned.physical, old_root.start_address().as_u64());
+    let frame = PhysFrame::from_start_address(PhysAddr::new(owned.physical)).unwrap();
+    // SAFETY: the complete tree has been cloned before activation, preserving
+    // all current code/data/stack mappings. Old tables stay reserved. Clearing
+    // PGE flushes global translations too; no other CPU can still use this CR3.
+    unsafe {
+        Cr4::write(cr4 & !Cr4Flags::PAGE_GLOBAL);
+        Cr3::write(frame, cache_flags);
+        Cr4::write(cr4);
+        Cr0::write(Cr0::read() | Cr0Flags::WRITE_PROTECT);
+    }
+    assert_eq!(Cr3::read().0, frame);
+    assert!(Cr0::read().contains(Cr0Flags::WRITE_PROTECT));
+    crate::log!(
+        "[ok] Generic-owned CR3 {:#x}, {} private page-table frames, WP enabled\n",
+        owned.physical,
+        owned.table_frames
+    );
+}
 
 pub struct HeapMapping {
     pub mapped_pages: u64,

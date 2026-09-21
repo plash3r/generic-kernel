@@ -5,8 +5,10 @@
    hybrid ISO boot tests and x128 reference smoke.
 2. Protected memory — in progress: permanent range-based PMM with free/coalesce,
    active x86_64 page-table mapper, RW+NX kernel heap and unmapped guard pages
-   are working. Remaining: Generic-owned top-level page tables, kernel-section
-   W^X hardening, richer page-fault diagnostics and allocator stress tests.
+   are working. Generic now owns the entire four-level table tree and CR3, with
+   CR0.WP enabled and rollback tests for failed table cloning. Remaining:
+   kernel-section W^X hardening, richer page-fault diagnostics and allocator
+   stress tests.
 3. Interrupts and time: ACPI/MADT, APIC/IOAPIC, timer and monotonic clock.
 4. Tasks: kernel threads, preemption, SMP, per-CPU state and synchronization.
 5. Isolation: ring 3, separate address spaces, syscalls, user-pointer checking,

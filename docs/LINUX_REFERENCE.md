@@ -46,8 +46,11 @@ permissions as part of the memory-management contract. Generic therefore keeps
 the active x86_64 mapper in arch/memory.rs and maps its kernel heap writable but
 non-executable. One unmapped guard page is left on each side of the heap.
 
-Generic does not yet replace the bootloader top-level table. Moving to a
-Generic-owned CR3 is the next protected-memory milestone.
+Generic now replaces the bootloader CR3 with a deep copy of the entire table
+tree allocated by its permanent PMM. Existing leaf mappings and permissions
+are retained. Bootloader frames remain reserved; they are not reclaimed until
+their other boot-time consumers can be audited. Section-level W^X and removing
+writable/executable aliases are separate remaining milestones.
 
 ### Permanent page allocator
 
