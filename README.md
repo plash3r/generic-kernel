@@ -25,12 +25,14 @@ The x86_64 path provides a no_std Rust kernel with:
 - a mapped 2 MiB kernel heap that is writable, non-executable and surrounded by
   unmapped guard pages;
 - heap allocation/deallocation smoke validation;
-- anti-aliased Noto Sans Mono 16 px framebuffer terminal and PS/2 keyboard input;
+- runtime-switchable framebuffer fonts: Noto Sans Mono presets plus custom PSF2 loading from VFS;
+- PS/2 keyboard input;
 - generated initramfs unpacked into the writable ramfs root;
 - generic VFS namespace with mount routing;
 - block-device abstraction, legacy virtio-blk PCI driver and PMM-backed DMA;
 - persistent GenericFS volume mounted at /mnt when storage is attached;
 - interactive file commands: cd/ls/cat/touch/mkdir/write/append/rm/stat/mounts;
+- console font commands: font list/set/load/reset;
 - freestanding Recontrol ABI integration;
 - hybrid ISO and disk boot smoke tests.
 
@@ -148,7 +150,7 @@ checks that the generated LLVM IR is reproducible.
 - userspace/recontrol/ — Recontrol source, generated IR and compiler revision.
 - tools/image/ — BIOS and UEFI disk-image builder.
 - scripts/ — build, ISO, QEMU, x128 and Recontrol commands.
-- docs/ — architecture decisions, Linux reference notes, roadmap and validation.
+- docs/ — architecture decisions, Linux reference notes, roadmap, fonts and validation.
 
 ## Current boundary
 

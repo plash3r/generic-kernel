@@ -1,5 +1,5 @@
 use crate::arch::{
-    framebuffer::Console,
+    framebuffer::{Console, FontPreset},
     keyboard::{Key, Keyboard},
 };
 use alloc::string::String;
@@ -7,6 +7,7 @@ use core::fmt::Write;
 use kernel_core::vfs::NodeKind;
 
 const MAX_LINE: usize = 256;
+const MAX_CUSTOM_FONT_BYTES: u64 = 512 * 1024;
 
 pub fn run(mut console: Console<'_>) -> ! {
     let mut keyboard = Keyboard::new();
@@ -88,6 +89,8 @@ fn execute(console: &mut Console<'_>, cwd: &mut String, input: &str) {
             console.width(),
             console.height()
         );
+    } else if command.eq_ignore_ascii_case("font") {
+        font(console, cwd, args);
     } else if command.eq_ignore_ascii_case("recontrol") {
         let value = crate::recontrol::probe();
         let _ = writeln!(console, "Recontrol ABI probe returned {value}");
@@ -134,6 +137,7 @@ fn help(console: &mut Console<'_>) {
     let _ = writeln!(console, "  ECHO TEXT            print text");
     let _ = writeln!(console, "  UNAME / VERSION      kernel information");
     let _ = writeln!(console, "  MEM / VIDEO          memory and framebuffer");
+    let _ = writeln!(console, "  FONT ...             inspect/change/load console font");
     let _ = writeln!(console, "  PWD / CD PATH        current directory");
     let _ = writeln!(console, "  LS [PATH]            list directory");
     let _ = writeln!(console, "  CAT PATH             read file");
@@ -149,6 +153,110 @@ fn help(console: &mut Console<'_>) {
     let _ = writeln!(console, "  MOUNTS               mounted filesystems");
     let _ = writeln!(console, "  RECONTROL            call Recontrol code");
     let _ = writeln!(console, "  REBOOT / HALT        reset or stop the VM");
+}
+
+
+fn font(console: &mut Console<'_>, cwd: &str, args: &str) {
+    let args = args.trim();
+    if args.is_empty() || args.eq_ignore_ascii_case("current") {
+        print_font(console);
+        return;
+    }
+
+    if args.eq_ignore_ascii_case("list") {
+        let _ = writeln!(console, "Built-in fonts:");
+        let _ = writeln!(console, "  noto16   Noto Sans Mono Regular 16 px (default)");
+        let _ = writeln!(console, "  noto20   Noto Sans Mono Regular 20 px");
+        let _ = writeln!(console, "  noto24   Noto Sans Mono Regular 24 px");
+        let _ = writeln!(console, "  bold16   Noto Sans Mono Bold 16 px");
+        let _ = writeln!(console, "  bold20   Noto Sans Mono Bold 20 px");
+        let _ = writeln!(console, "Custom: FONT LOAD PATH.psf (PSF2)");
+        return;
+    }
+
+    if args.eq_ignore_ascii_case("reset") {
+        console.set_font_preset(FontPreset::Noto16);
+        let _ = writeln!(console, "Font reset to noto16.");
+        print_font(console);
+        return;
+    }
+
+    let (action, value) = args
+        .split_once(' ')
+        .map(|(action, value)| (action, value.trim()))
+        .unwrap_or(("set", args));
+
+    if action.eq_ignore_ascii_case("set") {
+        let Some(preset) = FontPreset::parse(value) else {
+            let _ = writeln!(console, "font: unknown preset: {value}");
+            let _ = writeln!(console, "Use FONT LIST.");
+            return;
+        };
+        console.set_font_preset(preset);
+        let _ = writeln!(console, "Font changed to {}.", preset.name());
+        print_font(console);
+        return;
+    }
+
+    if action.eq_ignore_ascii_case("load") {
+        if value.is_empty() {
+            let _ = writeln!(console, "font: usage: FONT LOAD PATH.psf");
+            return;
+        }
+
+        let path = match crate::vfs::canonicalize(cwd, value) {
+            Ok(path) => path,
+            Err(error) => return vfs_error(console, "font", error),
+        };
+        let metadata = match crate::vfs::metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) => return vfs_error(console, "font", error),
+        };
+        if metadata.kind != NodeKind::File {
+            let _ = writeln!(console, "font: not a file: {path}");
+            return;
+        }
+        if metadata.len > MAX_CUSTOM_FONT_BYTES {
+            let _ = writeln!(
+                console,
+                "font: file too large ({} bytes, max {})",
+                metadata.len,
+                MAX_CUSTOM_FONT_BYTES
+            );
+            return;
+        }
+
+        let data = match crate::vfs::read_file(&path) {
+            Ok(data) => data,
+            Err(error) => return vfs_error(console, "font", error),
+        };
+
+        match console.load_psf2(data) {
+            Ok(glyphs) => {
+                let _ = writeln!(console, "Loaded PSF2 font: {path} ({glyphs} glyphs)");
+                print_font(console);
+            }
+            Err(error) => {
+                let _ = writeln!(console, "font: {error}");
+            }
+        }
+        return;
+    }
+
+    let _ = writeln!(console, "font: expected LIST, SET, LOAD, CURRENT or RESET");
+}
+
+fn print_font(console: &mut Console<'_>) {
+    let (width, height) = console.font_dimensions();
+    let _ = writeln!(
+        console,
+        "Font: {}  glyph={}x{}  grid={}x{}",
+        console.font_name(),
+        width,
+        height,
+        console.columns(),
+        console.rows()
+    );
 }
 
 fn memory(console: &mut Console<'_>) {
