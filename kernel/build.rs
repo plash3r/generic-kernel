@@ -19,7 +19,11 @@ fn main() {
     let user_gui = env::var_os("GENERIC_GUI_ELF").map(PathBuf::from);
     if let Some(path) = user_gui.as_ref() {
         println!("cargo:rerun-if-changed={}", path.display());
-        assert!(path.is_file(), "GENERIC_GUI_ELF does not point to a file: {}", path.display());
+        assert!(
+            path.is_file(),
+            "GENERIC_GUI_ELF does not point to a file: {}",
+            path.display()
+        );
     }
     build_initramfs(user_init.as_deref(), user_gui.as_deref());
 

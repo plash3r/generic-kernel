@@ -112,8 +112,7 @@ pub fn present_xrgb8888(address: u64, length: usize) -> Result<(), &'static str>
                 NativePixelFormat::Rgb => [red, green, blue, 0],
                 NativePixelFormat::Bgr => [blue, green, red, 0],
                 NativePixelFormat::U8 => {
-                    let intensity =
-                        ((red as u16 + green as u16 + blue as u16) / 3) as u8;
+                    let intensity = ((red as u16 + green as u16 + blue as u16) / 3) as u8;
                     [intensity, 0, 0, 0]
                 }
                 NativePixelFormat::Other => [blue, green, red, 0],

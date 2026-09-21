@@ -221,11 +221,7 @@ pub fn validate_user_range(
     Ok(())
 }
 
-pub fn copy_to_user(
-    address: u64,
-    data: &[u8],
-    maximum: usize,
-) -> Result<(), &'static str> {
+pub fn copy_to_user(address: u64, data: &[u8], maximum: usize) -> Result<(), &'static str> {
     if data.len() > maximum {
         return Err("userspace buffer exceeds syscall limit");
     }

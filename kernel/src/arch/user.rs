@@ -227,11 +227,7 @@ extern "C" fn generic_syscall_dispatch(
             write_u32(&mut bytes, 8, height);
             write_u32(&mut bytes, 12, width);
             write_u32(&mut bytes, 16, 4);
-            write_u32(
-                &mut bytes,
-                20,
-                crate::arch::display::SOURCE_FORMAT_XRGB8888,
-            );
+            write_u32(&mut bytes, 20, crate::arch::display::SOURCE_FORMAT_XRGB8888);
             write_u32(&mut bytes, 24, info.native_pixel_format);
             if crate::mm::copy_to_user(arg0, &bytes, DISPLAY_INFO_BYTES).is_err() {
                 return EFAULT;
