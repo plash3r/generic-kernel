@@ -200,6 +200,85 @@ fn run_init_process() {
     LAST_EXIT.store(exit, Ordering::SeqCst);
 }
 
+pub fn launch_graphical_shell() -> Result<u64, &'static str> {
+    const GUI_STACK_TOP: u64 = 0x0000_0000_0400_0000;
+    const GUI_STACK_PAGES: u64 = 16;
+
+    let bytes = crate::vfs::read_file("/bin/generic-gui")
+        .map_err(|_| "/bin/generic-gui is not present in initramfs")?;
+    let image = ElfImage::parse(&bytes).map_err(|_| "invalid /bin/generic-gui ELF")?;
+
+    let kernel_space = crate::mm::active_address_space();
+    let process_space = crate::mm::create_user_address_space()
+        .map_err(|_| "failed to create graphical shell address space")?;
+    if process_space.root == kernel_space.root {
+        return Err("graphical shell reused the kernel CR3");
+    }
+
+    load_image(&image, process_space).map_err(|_| "failed to map graphical shell ELF")?;
+    for page in 0..GUI_STACK_PAGES {
+        let address = GUI_STACK_TOP
+            .checked_sub((page + 1) * PAGE_SIZE)
+            .ok_or("graphical shell stack address underflow")?;
+        crate::mm::map_user_page(process_space, address, true, false, &[])
+            .map_err(|_| "failed to map graphical shell stack")?;
+    }
+
+    let pid = NEXT_PID.fetch_add(1, Ordering::SeqCst);
+    {
+        let mut processes = PROCESSES.lock();
+        processes.push(Process {
+            pid,
+            name: String::from("/bin/generic-gui"),
+            state: ProcessState::Ready,
+            entry: image.entry(),
+            cr3: process_space.root,
+            stack_top: GUI_STACK_TOP,
+            fds: [
+                Some(FdKind::Stdin),
+                Some(FdKind::Stdout),
+                Some(FdKind::Stderr),
+            ],
+            exit_code: None,
+        });
+        let process = processes
+            .iter_mut()
+            .find(|process| process.pid == pid)
+            .ok_or("graphical shell process disappeared")?;
+        process.state = ProcessState::Running;
+    }
+
+    crate::arch::input::drain();
+    crate::mm::activate_address_space(process_space)
+        .map_err(|_| "failed to activate graphical shell CR3")?;
+    CURRENT_PID.store(pid, Ordering::SeqCst);
+
+    crate::log!(
+        "[ok] launching Generic GUI: pid={} entry={:#x} CR3={:#x}\n",
+        pid,
+        image.entry(),
+        process_space.root
+    );
+
+    let exit = crate::arch::user::enter(image.entry(), GUI_STACK_TOP);
+
+    CURRENT_PID.store(0, Ordering::SeqCst);
+    crate::mm::activate_address_space(kernel_space)
+        .map_err(|_| "failed to restore kernel CR3 after graphical shell")?;
+
+    {
+        let mut processes = PROCESSES.lock();
+        let process = processes
+            .iter_mut()
+            .find(|process| process.pid == pid)
+            .ok_or("graphical shell process disappeared after exit")?;
+        process.state = ProcessState::Exited;
+        process.exit_code = Some(exit);
+    }
+    LAST_EXIT.store(exit, Ordering::SeqCst);
+    Ok(exit)
+}
+
 pub fn diagnostics() -> Diagnostics {
     let kernel_cr3 = crate::mm::active_address_space().root;
     let processes = PROCESSES.lock();

@@ -28,8 +28,10 @@
    preemptive multi-process scheduling, address-space teardown/refcounting, a
    more memory-efficient shared supervisor kernel half and a long-lived
    init/userspace runtime.
-   The first bounded user-pointer validation and stdout/stderr write syscall
-   are working; this must expand into general copyin/copyout and FD/VFS APIs.
+   Bounded copyin/copyout, stdout/stderr write, display discovery/present and
+   normalized input polling are working. The first Generic GUI userspace ELF
+   can boot in its own private CR3. Remaining: task-owned process context,
+   blocking waits, address-space teardown and general FD/VFS APIs.
 6. Recontrol userspace runtime: no_std Generic runtime, stable syscall ABI,
    process exit, byte/string output, allocation and panic path.
 7. Storage — working foundation: generic VFS, generated initramfs, block-device
@@ -52,5 +54,7 @@ interfaces. Generic deliberately does not inherit Linux compatibility layers
 that are not required by its own design.
 
 Graphical-shell and compositor development is maintained separately in
-`plash3r/generic-gui`. Generic kernel will expose the process, syscall, IPC,
-shared-memory, framebuffer/display and input contracts that the GUI consumes.
+`plash3r/generic-gui`. ABI v1 now connects that repository through validated
+display and input syscalls without exposing framebuffer MMIO to ring 3. The
+next GUI/kernel boundary work is shared-memory surfaces, IPC and blocking event
+delivery.

@@ -29,8 +29,19 @@ jobs:
           cargo build --locked --manifest-path .deps/recontrol-lang/Cargo.toml -p rcl
           RCL="$PWD/.deps/recontrol-lang/target/debug/rcl" bash scripts/recontrol.sh
           git diff --exit-code -- userspace/recontrol/kernel_probe.ll
+      - name: Generic GUI
+        uses: actions/checkout@v4
+        with:
+          repository: plash3r/generic-gui
+          ref: 1e8b198d42e270ce6aabdbc1f0a22609abba40e3
+          path: .deps/generic-gui
       - name: Emulator, ISO and LLVM tools
         run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 ovmf xorriso nasm
+      - name: Generic GUI userspace bridge
+        run: |
+          test "$(cat userspace/gui/REVISION)" = "1e8b198d42e270ce6aabdbc1f0a22609abba40e3"
+          GUI_ELF="$(GENERIC_GUI_ROOT="$PWD/.deps/generic-gui" bash scripts/gui.sh)"
+          GENERIC_GUI_ELF="$GUI_ELF" cargo build --locked -p generic-kernel --target x86_64-unknown-none --release
       - name: UEFI disk boot smoke test
         run: |
           bash scripts/build.sh smoke

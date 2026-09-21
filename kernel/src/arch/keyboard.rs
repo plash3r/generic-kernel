@@ -5,6 +5,7 @@ const QUEUE_CAPACITY: usize = 256;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Key {
     Char(u8),
+    Tab,
     Enter,
     Backspace,
     Escape,
@@ -140,6 +141,7 @@ impl Keyboard {
                 return None;
             }
             0x01 => return Some(Key::Escape),
+            0x0f => return Some(Key::Tab),
             0x1c => return Some(Key::Enter),
             0x0e => return Some(Key::Backspace),
             0x58 => return Some(Key::F12),
@@ -211,7 +213,6 @@ impl Keyboard {
             0x34 => (b'.', b'>'),
             0x35 => (b'/', b'?'),
             0x39 => (b' ', b' '),
-            0x0f => (b' ', b' '),
             _ => return None,
         };
 

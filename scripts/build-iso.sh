@@ -25,6 +25,14 @@ for tool in nasm xorriso; do
   fi
 done
 
+if [[ "$mode" == "normal" && -z "${GENERIC_GUI_ELF:-}" ]]; then
+  if [[ -n "${GENERIC_GUI_ROOT:-}" || -f ../generic-gui/Cargo.toml || -f .deps/generic-gui/Cargo.toml ]]; then
+    export GENERIC_GUI_ELF
+    GENERIC_GUI_ELF="$(bash scripts/gui.sh)"
+    echo "Including Generic GUI: $GENERIC_GUI_ELF"
+  fi
+fi
+
 cargo build --locked -p generic-kernel --target x86_64-unknown-none --release "${features[@]}"
 kernel="target/x86_64-unknown-none/release/generic-kernel"
 uefi="build/${stem}-uefi.img"

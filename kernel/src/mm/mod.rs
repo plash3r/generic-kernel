@@ -201,6 +201,47 @@ pub fn map_user_page(
     )
 }
 
+pub fn validate_user_range(
+    address: u64,
+    length: usize,
+    writable: bool,
+) -> Result<(), &'static str> {
+    if length == 0 {
+        return Ok(());
+    }
+
+    let offset = (*PHYSICAL_MEMORY_OFFSET.lock()).ok_or("physical memory is not initialized")?;
+    if !crate::arch::memory::user_range_accessible(offset, address, length, writable) {
+        return Err(if writable {
+            "invalid userspace write buffer"
+        } else {
+            "invalid userspace read buffer"
+        });
+    }
+    Ok(())
+}
+
+pub fn copy_to_user(
+    address: u64,
+    data: &[u8],
+    maximum: usize,
+) -> Result<(), &'static str> {
+    if data.len() > maximum {
+        return Err("userspace buffer exceeds syscall limit");
+    }
+    validate_user_range(address, data.len(), true)?;
+    if data.is_empty() {
+        return Ok(());
+    }
+
+    // SAFETY: the complete destination range was verified present,
+    // USER_ACCESSIBLE and writable in the active process page tables.
+    unsafe {
+        core::ptr::copy_nonoverlapping(data.as_ptr(), address as *mut u8, data.len());
+    }
+    Ok(())
+}
+
 pub fn copy_from_user(
     address: u64,
     length: usize,
@@ -213,10 +254,7 @@ pub fn copy_from_user(
         return Ok(Vec::new());
     }
 
-    let offset = (*PHYSICAL_MEMORY_OFFSET.lock()).ok_or("physical memory is not initialized")?;
-    if !crate::arch::memory::user_range_accessible(offset, address, length, false) {
-        return Err("invalid userspace read buffer");
-    }
+    validate_user_range(address, length, false)?;
 
     let mut data = Vec::with_capacity(length);
     // SAFETY: every page in the range was verified PRESENT + USER_ACCESSIBLE

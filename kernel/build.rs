@@ -8,6 +8,7 @@ fn main() {
     println!("cargo:rerun-if-changed=../userspace/recontrol/kernel_probe.ll");
     println!("cargo:rerun-if-env-changed=CLANG");
     println!("cargo:rerun-if-env-changed=LLD");
+    println!("cargo:rerun-if-env-changed=GENERIC_GUI_ELF");
 
     let target = env::var("TARGET").expect("TARGET is set by Cargo");
     let user_init = if target == "x86_64-unknown-none" {
@@ -15,7 +16,12 @@ fn main() {
     } else {
         None
     };
-    build_initramfs(user_init.as_deref());
+    let user_gui = env::var_os("GENERIC_GUI_ELF").map(PathBuf::from);
+    if let Some(path) = user_gui.as_ref() {
+        println!("cargo:rerun-if-changed={}", path.display());
+        assert!(path.is_file(), "GENERIC_GUI_ELF does not point to a file: {}", path.display());
+    }
+    build_initramfs(user_init.as_deref(), user_gui.as_deref());
 
     if target != "x86_64-unknown-none" {
         return;
@@ -94,7 +100,7 @@ fn build_user_init() -> PathBuf {
     elf
 }
 
-fn build_initramfs(user_init: Option<&Path>) {
+fn build_initramfs(user_init: Option<&Path>, user_gui: Option<&Path>) {
     let manifest = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("manifest dir"));
     let root = manifest.join("../initramfs");
     println!("cargo:rerun-if-changed={}", root.display());
@@ -106,6 +112,10 @@ fn build_initramfs(user_init: Option<&Path>) {
     if let Some(user_init) = user_init {
         let data = fs::read(user_init).expect("read generated userspace init ELF");
         append_record(&mut archive, 1, "bin/init", &data);
+    }
+    if let Some(user_gui) = user_gui {
+        let data = fs::read(user_gui).expect("read Generic GUI userspace ELF");
+        append_record(&mut archive, 1, "bin/generic-gui", &data);
     }
     archive.push(0);
 

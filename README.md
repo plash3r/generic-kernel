@@ -39,6 +39,10 @@ The x86_64 path provides a no_std Rust kernel with:
   lifecycle on a dedicated kernel task;
 - bounded page-table-validated userspace pointers plus the first byte-oriented
   `write(fd, ptr, len)` syscall and per-process stdin/stdout/stderr descriptors;
+- Generic GUI ABI v1: validated display info/copyout, XRGB8888 full-frame
+  presentation and normalized keyboard/mouse input packets;
+- optional freestanding `/bin/generic-gui` from `plash3r/generic-gui`, launched
+  in its own private CR3 as the graphical shell on normal builds;
 - interrupt-driven PS/2 keyboard and mouse event queues with wheel detection;
 - runtime-switchable framebuffer fonts: Noto Sans Mono presets plus custom PSF2 loading from VFS;
 - generated initramfs unpacked into the writable ramfs root;
@@ -71,9 +75,17 @@ On Ubuntu / WSL2 install:
 
     sudo apt-get install build-essential clang lld pkg-config qemu-system-x86 ovmf python3 xorriso nasm
 
+For a GUI-enabled build, clone the GUI repository beside the kernel:
+
+    git clone https://github.com/plash3r/generic-gui ../generic-gui
+
 Then build:
 
     bash scripts/build-iso.sh
+
+The build script compiles `generic-gui-user` automatically and adds it to the
+initramfs as `/bin/generic-gui`. If the GUI checkout is absent, Generic falls
+back to the framebuffer kernel console.
 
 The result is:
 
@@ -190,6 +202,7 @@ checks that the generated LLVM IR is reproducible.
 - tools/x128.py — x128 assembler/reference emulator.
 - tools/uefi_iso.py — builds the hybrid BIOS + UEFI ISO.
 - userspace/recontrol/ — Recontrol source, generated IR and compiler revision.
+- userspace/gui/ — pinned Generic GUI integration revision.
 - tools/image/ — BIOS and UEFI disk-image builder.
 - scripts/ — build, ISO, QEMU, x128 and Recontrol commands.
 - docs/ — architecture decisions, Linux reference notes, roadmap, kernel command, fonts and validation.

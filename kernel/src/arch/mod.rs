@@ -1,6 +1,8 @@
 pub mod acpi;
 pub mod apic;
+pub mod display;
 pub mod framebuffer;
+pub mod input;
 pub mod interrupts;
 pub mod keyboard;
 pub mod memory;
