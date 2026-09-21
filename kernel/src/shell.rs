@@ -208,7 +208,10 @@ fn kernel_help(console: &mut Console<'_>) {
     let _ = writeln!(console, "  DIAGNOSTICS          run kernel self-checks");
     let _ = writeln!(console, "  VERSION              kernel version");
     let _ = writeln!(console, "  MEMORY               physical memory and heap");
-    let _ = writeln!(console, "  TASKS                kernel scheduler/task state");
+    let _ = writeln!(
+        console,
+        "  TASKS                kernel scheduler/task state"
+    );
     let _ = writeln!(console, "  VIDEO                framebuffer information");
     let _ = writeln!(
         console,
@@ -259,10 +262,7 @@ fn kernel_status(console: &mut Console<'_>) {
     let _ = writeln!(
         console,
         "Tasks: {} total, {} running, {} sleeping, {} switches",
-        scheduler.total,
-        scheduler.running,
-        scheduler.sleeping,
-        scheduler.context_switches
+        scheduler.total, scheduler.running, scheduler.sleeping, scheduler.context_switches
     );
     let _ = writeln!(console, "Mounts: {}", mounts.len());
     for mount in mounts {
@@ -706,11 +706,7 @@ fn tasks(console: &mut Console<'_>) {
                 );
             }
             None => {
-                let _ = writeln!(
-                    console,
-                    "  #{:<3} {:<12} {}",
-                    task.id, task.name, state
-                );
+                let _ = writeln!(console, "  #{:<3} {:<12} {}", task.id, task.name, state);
             }
         }
     }
