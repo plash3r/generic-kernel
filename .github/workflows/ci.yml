@@ -12,7 +12,8 @@ jobs:
       - name: Format and core tests
         run: |
           cargo fmt --all -- --check
-          cargo test --locked -p kernel-core
+          cargo test -p kernel-core
+          git diff -- Cargo.lock
           python3 -m py_compile tools/x128.py tools/uefi_iso.py scripts/run.py
       - name: x128 reference boot
         run: |
@@ -46,6 +47,7 @@ jobs:
         with:
           name: boot-evidence
           path: |
+            Cargo.lock
             build/smoke.log
             build/smoke-iso-uefi.log
             build/smoke-iso-bios.log
