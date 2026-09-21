@@ -1,6 +1,7 @@
 pub mod framebuffer;
 pub mod interrupts;
 pub mod keyboard;
+pub mod memory;
 pub mod serial;
 
 pub fn halt() -> ! {

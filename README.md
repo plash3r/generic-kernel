@@ -7,16 +7,32 @@ UEFI boot paths for the VirtualBox/QEMU ISO. The repository also contains an
 experimental x128 reference architecture that can execute Generic's bootstrap
 in a deterministic emulator.
 
+Generic is intentionally its own kernel. Upstream Linux is used as a design
+reference for subsystem boundaries and proven kernel architecture, while
+Generic keeps a smaller Rust-first implementation. See docs/LINUX_REFERENCE.md.
+
 ## Working now
 
-The x86_64 path provides a no_std Rust kernel, BIOS/UEFI loading, COM1
-diagnostics, GDT/TSS/IDT, selected CPU exception handlers, a bootstrap
-physical-frame allocator, RAM write/read validation, a framebuffer terminal,
-PS/2 keyboard input and QEMU smoke tests.
+The x86_64 path provides a no_std Rust kernel with:
 
-Recontrol is integrated at the kernel ABI boundary. A function compiled from
-userspace/recontrol/kernel_probe.rcl is turned into freestanding LLVM code,
-linked into the kernel ELF and called during boot.
+- BIOS and UEFI loading;
+- COM1 diagnostics;
+- GDT/TSS/IDT and selected exception handlers;
+- permanent physical-memory management with page allocation, free and
+  coalescing;
+- x86_64 page-table mapping for kernel-owned virtual ranges;
+- a mapped 2 MiB kernel heap that is writable, non-executable and surrounded by
+  unmapped guard pages;
+- heap allocation/deallocation smoke validation;
+- framebuffer terminal and PS/2 keyboard input;
+- freestanding Recontrol ABI integration;
+- hybrid ISO and disk boot smoke tests.
+
+A successful memory bring-up includes diagnostics similar to:
+
+    [ok] physical frames ..., allocate/free/coalesce
+    [ok] PMM ... MiB managed in ... regions, ... MiB free
+    [ok] kernel heap 2048 KiB @ 0x444400000000, 512 pages, RW+NX, guard pages
 
 ## Build a VirtualBox ISO
 
@@ -100,7 +116,9 @@ checks that the generated LLVM IR is reproducible.
 ## Project layout
 
 - kernel/ — freestanding x86_64 kernel.
-- crates/kernel-core/ — platform-independent safe algorithms.
+- kernel/src/mm/ — Generic memory-management policy and kernel heap.
+- kernel/src/arch/ — x86_64-specific descriptor tables, MMU, I/O and devices.
+- crates/kernel-core/ — platform-independent safe algorithms and PMM policy.
 - arch/x86/ — x86 bootstrap helpers used by optical boot.
 - arch/x128/ — x128 bootstrap source.
 - tools/x128.py — x128 assembler/reference emulator.
@@ -108,11 +126,14 @@ checks that the generated LLVM IR is reproducible.
 - userspace/recontrol/ — Recontrol source, generated IR and compiler revision.
 - tools/image/ — BIOS and UEFI disk-image builder.
 - scripts/ — build, ISO, QEMU, x128 and Recontrol commands.
-- docs/ — architecture decisions, roadmap and validation notes.
+- docs/ — architecture decisions, Linux reference notes, roadmap and validation.
 
 ## Current boundary
 
-Generic now has executable boot paths and automated acceptance checks, but it is
-not yet a complete general-purpose desktop/server OS. It still needs its own VM
-manager and heap, hardware IRQ/timer support, scheduler/SMP, ring 3, syscalls,
-user ELF loading, VFS/storage, mature input/graphics drivers and networking.
+Generic now has executable boot paths, a permanent PMM and an early protected
+kernel heap, but it is not yet a complete general-purpose desktop/server OS.
+
+The protected-memory stage still needs Generic-owned top-level page tables,
+full kernel-section W^X enforcement and richer fault coverage. Later stages add
+APIC/IOAPIC and timekeeping, scheduler/SMP, ring 3, syscalls, user ELF loading,
+VFS/storage, mature input/graphics drivers and networking.

@@ -1,6 +1,9 @@
 #![no_std]
 #![forbid(unsafe_code)]
 
+pub mod physical;
+pub use physical::{PhysicalMemory, PhysicalMemoryError};
+
 pub const PAGE_SIZE: u64 = 4096;
 
 /// A physical byte range [start, end) already classified as usable by the loader.
@@ -16,8 +19,10 @@ pub enum MapError {
     OverlapOrUnsorted,
 }
 
-/// Bootstrap allocator: unique 4 KiB frames, no free operation, no heap required.
-/// Ownership must later be transferred to the permanent allocator; never reset it.
+/// Bootstrap allocator kept for tiny pre-PMM users and regression coverage.
+///
+/// New kernel boot code should transition to PhysicalMemory, which owns its
+/// metadata and supports freeing and coalescing.
 pub struct FrameAllocator<'a> {
     regions: &'a [Region],
     index: usize,
@@ -48,7 +53,7 @@ impl<'a> FrameAllocator<'a> {
             let start = self.next.max(region.start).max(PAGE_SIZE);
             let aligned = start
                 .checked_add(PAGE_SIZE - 1)
-                .map(|v| v & !(PAGE_SIZE - 1));
+                .map(|value| value & !(PAGE_SIZE - 1));
             if let Some(frame) = aligned {
                 if let Some(end) = frame.checked_add(PAGE_SIZE) {
                     if end <= region.end {

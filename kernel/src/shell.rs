@@ -6,13 +6,7 @@ use core::fmt::Write;
 
 const MAX_LINE: usize = 128;
 
-#[derive(Clone, Copy)]
-pub struct SystemStats {
-    pub usable_regions: usize,
-    pub usable_bytes: u64,
-}
-
-pub fn run(mut console: Console<'_>, stats: SystemStats) -> ! {
+pub fn run(mut console: Console<'_>) -> ! {
     let mut keyboard = Keyboard::new();
     keyboard.drain();
 
@@ -47,7 +41,7 @@ pub fn run(mut console: Console<'_>, stats: SystemStats) -> ! {
         }
 
         let input = core::str::from_utf8(&line[..len]).unwrap_or("");
-        execute(&mut console, input, stats);
+        execute(&mut console, input);
     }
 }
 
@@ -61,7 +55,7 @@ fn banner(console: &mut Console<'_>) {
     let _ = writeln!(console);
 }
 
-fn execute(console: &mut Console<'_>, input: &str, stats: SystemStats) {
+fn execute(console: &mut Console<'_>, input: &str) {
     let input = input.trim();
     if input.is_empty() {
         return;
@@ -79,7 +73,7 @@ fn execute(console: &mut Console<'_>, input: &str, stats: SystemStats) {
         let _ = writeln!(console, "  ECHO TEXT  print text");
         let _ = writeln!(console, "  UNAME      kernel and architecture");
         let _ = writeln!(console, "  VERSION    Generic version");
-        let _ = writeln!(console, "  MEM        usable boot memory");
+        let _ = writeln!(console, "  MEM        PMM and kernel heap status");
         let _ = writeln!(console, "  VIDEO      framebuffer information");
         let _ = writeln!(console, "  RECONTROL  call Recontrol code");
         let _ = writeln!(console, "  WHOAMI     current execution context");
@@ -96,11 +90,19 @@ fn execute(console: &mut Console<'_>, input: &str, stats: SystemStats) {
     } else if command.eq_ignore_ascii_case("version") {
         let _ = writeln!(console, "Generic OS kernel 0.1.0");
     } else if command.eq_ignore_ascii_case("mem") {
-        let mib = stats.usable_bytes / (1024 * 1024);
+        let stats = crate::mm::stats();
         let _ = writeln!(
             console,
-            "Usable memory: {} MiB in {} regions",
-            mib, stats.usable_regions
+            "Physical: {} MiB total, {} MiB free, {} regions",
+            stats.physical_total / (1024 * 1024),
+            stats.physical_free / (1024 * 1024),
+            stats.managed_regions
+        );
+        let _ = writeln!(
+            console,
+            "Heap: {} KiB total, {} KiB free, RW+NX + guards",
+            stats.heap_total / 1024,
+            stats.heap_free / 1024
         );
     } else if command.eq_ignore_ascii_case("video") {
         let _ = writeln!(
