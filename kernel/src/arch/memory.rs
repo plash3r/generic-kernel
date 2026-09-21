@@ -93,7 +93,7 @@ pub fn map_heap<const N: usize>(
         let physical = allocator
             .allocate_physical()
             .expect("out of physical memory while mapping kernel heap");
-        zero_physical_frame(physical_offset, physical);
+        zero_physical_frame(physical_memory_offset, physical);
         let frame = PhysFrame::<Size4KiB>::containing_address(PhysAddr::new(physical));
 
         // SAFETY: page is verified unmapped, frame is uniquely allocated from
