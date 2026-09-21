@@ -261,8 +261,7 @@ pub fn map_user_page<const N: usize>(
     let physical_offset = VirtAddr::new(physical_memory_offset);
     // SAFETY: the supplied root is a process-owned PML4 reachable through the
     // direct map. Its first slot is private to this address space.
-    let mut mapper =
-        unsafe { offset_page_table_for_root(address_space.root, physical_offset)? };
+    let mut mapper = unsafe { offset_page_table_for_root(address_space.root, physical_offset)? };
     let page = Page::<Size4KiB>::from_start_address(VirtAddr::new(virtual_address))
         .map_err(|_| "unaligned user page")?;
     if mapper.translate_addr(page.start_address()).is_some() {
