@@ -105,7 +105,13 @@ You can test both firmware paths in QEMU:
     python3 scripts/run.py --iso --graphical
     python3 scripts/run.py --iso --bios --graphical
 
-CI boots the smoke ISO in both UEFI and legacy BIOS modes.
+For a headless integration check that requires the ring 3 GUI to present its
+first desktop frame:
+
+    python3 scripts/run.py --gui-smoke
+
+CI boots the smoke ISO in both UEFI and legacy BIOS modes and also performs this
+GUI bridge check on the normal UEFI disk image.
 
 ## VirtualBox
 

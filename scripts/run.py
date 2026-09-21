@@ -10,6 +10,11 @@ import sys
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
 parser.add_argument("--smoke", action="store_true")
+parser.add_argument(
+    "--gui-smoke",
+    action="store_true",
+    help="boot a normal GUI-enabled image and require the first userspace desktop frame",
+)
 parser.add_argument("--debug", action="store_true", help="wait for GDB on localhost:1234")
 parser.add_argument(
     "--graphical",
@@ -40,6 +45,10 @@ args = parser.parse_args()
 
 if args.smoke and args.debug:
     parser.error("--smoke and --debug are mutually exclusive")
+if args.gui_smoke and (args.smoke or args.debug or args.graphical):
+    parser.error("--gui-smoke cannot be combined with --smoke, --debug or --graphical")
+if args.gui_smoke and (args.iso or args.bios or args.storage):
+    parser.error("--gui-smoke currently validates the normal UEFI disk image only")
 if args.smoke and args.graphical:
     parser.error("--smoke and --graphical are mutually exclusive")
 if args.bios and not args.iso:
@@ -143,6 +152,41 @@ if not args.graphical:
     cmd += ["-display", "none"]
 if args.debug:
     cmd += ["-S", "-gdb", "tcp:127.0.0.1:1234"]
+
+if args.gui_smoke:
+    try:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=20,
+        )
+        output = result.stdout
+        code = result.returncode
+    except subprocess.TimeoutExpired as exc:
+        output = exc.stdout or b""
+        code = None
+
+    log_path = root / "build" / "gui-smoke.log"
+    log_path.write_bytes(output)
+    sys.stdout.buffer.write(output)
+
+    required = [
+        b"[ok] launching Generic GUI:",
+        b"GENERIC GUI: userspace display server starting",
+        b"GENERIC GUI: desktop presented; input loop active",
+    ]
+    if (
+        any(marker not in output for marker in required)
+        or b"GENERIC: PANIC" in output
+        or b"GENERIC GUI: panic" in output
+    ):
+        sys.exit(
+            f"GUI smoke FAILED (QEMU exit={code}); see build/{log_path.name}"
+        )
+    print("GUI smoke PASSED: ring3 display server presented the first desktop frame")
+    sys.exit(0)
+
 if not args.smoke:
     sys.exit(subprocess.call(cmd))
 

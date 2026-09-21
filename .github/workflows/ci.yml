@@ -41,7 +41,8 @@ jobs:
         run: |
           test "$(cat userspace/gui/REVISION)" = "1e8b198d42e270ce6aabdbc1f0a22609abba40e3"
           GUI_ELF="$(GENERIC_GUI_ROOT="$PWD/.deps/generic-gui" bash scripts/gui.sh)"
-          GENERIC_GUI_ELF="$GUI_ELF" cargo build --locked -p generic-kernel --target x86_64-unknown-none --release
+          GENERIC_GUI_ELF="$GUI_ELF" bash scripts/build.sh normal
+          python3 scripts/run.py --gui-smoke
       - name: UEFI disk boot smoke test
         run: |
           bash scripts/build.sh smoke
@@ -62,6 +63,7 @@ jobs:
         with:
           name: boot-evidence
           path: |
+            build/gui-smoke.log
             build/smoke.log
             build/smoke-storage.log
             build/generic-storage.img
