@@ -74,7 +74,8 @@ See `docs/FONTS.md` for PSF2 loading details.
 These are read-only inspection commands for the current kernel state.
 `kernel tasks` lists scheduler task IDs, names, states, sleep deadlines and
 the cumulative context-switch count. `kernel processes` lists known userspace
-processes, ELF entry addresses, private CR3 roots and exit status.
+processes, ELF entry addresses, private CR3 roots, descriptor count and exit
+status.
 
 ### Machine control
 

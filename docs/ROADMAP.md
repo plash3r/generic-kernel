@@ -25,8 +25,9 @@
    works with the bootloader's existing low-half mappings. A process table
    tracks CR3, entry point and lifecycle. Remaining: asynchronous process
    scheduling, address-space teardown/refcounting, a more memory-efficient
-   shared supervisor kernel half, robust user-pointer checking and a long-lived
-   init/userspace runtime.
+   shared supervisor kernel half and a long-lived init/userspace runtime.
+   The first bounded user-pointer validation and stdout/stderr write syscall
+   are working; this must expand into general copyin/copyout and FD/VFS APIs.
 6. Recontrol userspace runtime: no_std Generic runtime, stable syscall ABI,
    process exit, byte/string output, allocation and panic path.
 7. Storage — working foundation: generic VFS, generated initramfs, block-device

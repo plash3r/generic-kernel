@@ -6,9 +6,14 @@ use x86_64::VirtAddr;
 
 pub const SYS_EXIT: u64 = 0;
 pub const SYS_TICKS: u64 = 1;
+pub const SYS_WRITE: u64 = 2;
 
 const EXIT_SENTINEL: u64 = u64::MAX;
 pub const ENOSYS: u64 = u64::MAX - 1;
+const EBADF: u64 = u64::MAX - 2;
+const EFAULT: u64 = u64::MAX - 3;
+const E2BIG: u64 = u64::MAX - 4;
+const MAX_WRITE_BYTES: usize = 4096;
 
 static LAST_CPL: AtomicU64 = AtomicU64::new(0);
 static LAST_EXIT: AtomicU64 = AtomicU64::new(0);
@@ -65,7 +70,9 @@ generic_int80_entry:
 
     mov rdi, [rsp + 112]
     mov rsi, [rsp + 72]
-    mov rdx, [rsp + 128]
+    mov rdx, [rsp + 64]
+    mov rcx, [rsp + 88]
+    mov r8, [rsp + 128]
     call generic_syscall_dispatch
 
     cmp rax, -1
@@ -159,7 +166,13 @@ pub fn enter(user_rip: u64, user_rsp: u64) -> u64 {
 }
 
 #[no_mangle]
-extern "C" fn generic_syscall_dispatch(number: u64, arg0: u64, caller_cs: u64) -> u64 {
+extern "C" fn generic_syscall_dispatch(
+    number: u64,
+    arg0: u64,
+    arg1: u64,
+    arg2: u64,
+    caller_cs: u64,
+) -> u64 {
     LAST_CPL.store(caller_cs & 3, Ordering::SeqCst);
 
     match number {
@@ -172,6 +185,20 @@ extern "C" fn generic_syscall_dispatch(number: u64, arg0: u64, caller_cs: u64) -
             EXIT_SENTINEL
         }
         SYS_TICKS => crate::arch::timer::ticks(),
+        SYS_WRITE => {
+            let Ok(length) = usize::try_from(arg2) else {
+                return E2BIG;
+            };
+            let data = match crate::mm::copy_from_user(arg1, length, MAX_WRITE_BYTES) {
+                Ok(data) => data,
+                Err("userspace buffer exceeds syscall limit") => return E2BIG,
+                Err(_) => return EFAULT,
+            };
+            match crate::process::write_current_fd(arg0, &data) {
+                Ok(written) => written as u64,
+                Err(_) => EBADF,
+            }
+        }
         _ => ENOSYS,
     }
 }

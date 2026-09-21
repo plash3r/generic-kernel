@@ -186,6 +186,8 @@ pub struct AddressSpace {
     pub root: u64,
 }
 
+pub const USER_ADDRESS_LIMIT: u64 = 1u64 << 39;
+
 pub fn active_root() -> u64 {
     Cr3::read().0.start_address().as_u64()
 }
@@ -253,8 +255,8 @@ pub fn map_user_page<const N: usize>(
     if initial.len() > PAGE_SIZE as usize {
         return Err("initial user page data exceeds one page");
     }
-    if virtual_address >= (1u64 << 39) {
-        return Err("user virtual address exceeds private process region");
+    if virtual_address >= USER_ADDRESS_LIMIT {
+        return Err("user virtual address exceeds Generic userspace limit");
     }
 
     let physical_offset = VirtAddr::new(physical_memory_offset);
@@ -308,6 +310,105 @@ pub fn map_user_page<const N: usize>(
     }
 
     Ok(physical)
+}
+
+pub fn user_range_accessible(
+    physical_memory_offset: u64,
+    address: u64,
+    length: usize,
+    writable: bool,
+) -> bool {
+    if length == 0 {
+        return address < USER_ADDRESS_LIMIT;
+    }
+
+    let Some(last) = address.checked_add(length as u64 - 1) else {
+        return false;
+    };
+    if address >= USER_ADDRESS_LIMIT || last >= USER_ADDRESS_LIMIT {
+        return false;
+    }
+
+    let root = active_root();
+    let first_page = address & !(PAGE_SIZE - 1);
+    let last_page = last & !(PAGE_SIZE - 1);
+    let mut page = first_page;
+
+    loop {
+        if !user_page_accessible(physical_memory_offset, root, page, writable) {
+            return false;
+        }
+        if page == last_page {
+            break;
+        }
+        let Some(next) = page.checked_add(PAGE_SIZE) else {
+            return false;
+        };
+        page = next;
+    }
+
+    true
+}
+
+fn user_page_accessible(
+    physical_memory_offset: u64,
+    root: u64,
+    virtual_address: u64,
+    writable: bool,
+) -> bool {
+    const PRESENT: u64 = 1 << 0;
+    const WRITABLE: u64 = 1 << 1;
+    const USER: u64 = 1 << 2;
+    const HUGE: u64 = 1 << 7;
+    const ADDRESS_MASK: u64 = 0x000f_ffff_ffff_f000;
+
+    let indexes = [
+        ((virtual_address >> 39) & 0x1ff) as usize,
+        ((virtual_address >> 30) & 0x1ff) as usize,
+        ((virtual_address >> 21) & 0x1ff) as usize,
+        ((virtual_address >> 12) & 0x1ff) as usize,
+    ];
+
+    let mut table = root;
+    for (level, index) in indexes.into_iter().enumerate() {
+        let Ok(pointer) = page_table_entry_pointer(physical_memory_offset, table, index) else {
+            return false;
+        };
+        // SAFETY: pointer addresses a live page-table entry through the
+        // physical direct map. The single bootstrap CPU owns page-table edits.
+        let entry = unsafe { pointer.read_volatile() };
+        if entry & PRESENT == 0 || entry & USER == 0 {
+            return false;
+        }
+        if writable && entry & WRITABLE == 0 {
+            return false;
+        }
+
+        if level == 3 || (level >= 1 && entry & HUGE != 0) {
+            return true;
+        }
+        table = entry & ADDRESS_MASK;
+        if table == 0 {
+            return false;
+        }
+    }
+
+    false
+}
+
+fn page_table_entry_pointer(
+    physical_memory_offset: u64,
+    table_physical: u64,
+    index: usize,
+) -> Result<*mut u64, &'static str> {
+    if index >= 512 || table_physical % PAGE_SIZE != 0 {
+        return Err("invalid page-table entry");
+    }
+    let address = physical_memory_offset
+        .checked_add(table_physical)
+        .and_then(|base| base.checked_add((index * core::mem::size_of::<u64>()) as u64))
+        .ok_or("page-table direct-map overflow")?;
+    Ok(VirtAddr::new(address).as_mut_ptr::<u64>())
 }
 
 pub struct HeapMapping {

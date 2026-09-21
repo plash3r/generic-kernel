@@ -35,6 +35,8 @@ The x86_64 path provides a no_std Rust kernel with:
   minimal process table tracking its CPL3 execution/exit;
 - per-process CR3 isolation with a deep-cloned private page-table tree; user
   mappings cannot mutate the kernel's active page tables;
+- bounded page-table-validated userspace pointers plus the first byte-oriented
+  `write(fd, ptr, len)` syscall and per-process stdin/stdout/stderr descriptors;
 - interrupt-driven PS/2 keyboard and mouse event queues with wheel detection;
 - runtime-switchable framebuffer fonts: Noto Sans Mono presets plus custom PSF2 loading from VFS;
 - generated initramfs unpacked into the writable ramfs root;
@@ -56,6 +58,7 @@ A successful memory bring-up includes diagnostics similar to:
     [ok] interrupt event loop + PIT timer 100 Hz (... ticks)
     [ok] scheduler context switch: ... switches, ... task(s)
     [ok] process address space: kernel CR3=..., pid1 CR3=..., private page-table tree
+    GENERIC USER: /bin/init via validated write syscall
     [ok] userspace ELF /bin/init: entry=0x400000, CPL3, exit=...
     [ok] framebuffer console smoke
 
@@ -199,6 +202,7 @@ The protected-memory stage still needs full kernel-section W^X enforcement and
 richer fault coverage. Graphical-shell development now lives in the separate `plash3r/generic-gui`
 repository. The kernel keeps framebuffer, input, timer and future userspace/IPC
 mechanisms, but not the desktop/window manager itself. The next kernel stages
-harden the scheduler with IRQ preemption/SMP, then integrate the now-isolated ELF processes with the scheduler, add safe
-user-pointer/FD syscalls and process teardown, followed by IPC/shared memory,
+harden the scheduler with IRQ preemption/SMP, then integrate the now-isolated ELF processes with the scheduler, expand the
+validated pointer/FD foundation into VFS syscalls and process teardown, followed
+by IPC/shared memory,
 production-grade storage drivers/filesystem recovery, USB HID and networking.

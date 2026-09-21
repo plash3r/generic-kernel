@@ -12,6 +12,13 @@ pub enum ProcessState {
     Exited,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FdKind {
+    Stdin,
+    Stdout,
+    Stderr,
+}
+
 #[derive(Clone, Debug)]
 struct Process {
     pid: u64,
@@ -19,6 +26,7 @@ struct Process {
     state: ProcessState,
     entry: u64,
     cr3: u64,
+    fds: [Option<FdKind>; 3],
     exit_code: Option<u64>,
 }
 
@@ -29,6 +37,7 @@ pub struct ProcessInfo {
     pub state: ProcessState,
     pub entry: u64,
     pub cr3: u64,
+    pub fd_count: usize,
     pub exit_code: Option<u64>,
 }
 
@@ -46,6 +55,7 @@ static PROCESSES: Mutex<Vec<Process>> = Mutex::new(Vec::new());
 static NEXT_PID: AtomicU64 = AtomicU64::new(1);
 static PROBE_OK: AtomicBool = AtomicBool::new(false);
 static LAST_EXIT: AtomicU64 = AtomicU64::new(0);
+static CURRENT_PID: AtomicU64 = AtomicU64::new(0);
 
 pub fn init_probe() {
     if PROBE_OK.load(Ordering::SeqCst) {
@@ -77,15 +87,22 @@ pub fn init_probe() {
             state: ProcessState::Running,
             entry: image.entry(),
             cr3: process_space.root,
+            fds: [
+                Some(FdKind::Stdin),
+                Some(FdKind::Stdout),
+                Some(FdKind::Stderr),
+            ],
             exit_code: None,
         });
     }
 
     crate::mm::activate_address_space(process_space).expect("failed to activate /bin/init CR3");
     assert_eq!(crate::mm::active_address_space(), process_space);
+    CURRENT_PID.store(pid, Ordering::SeqCst);
 
     let exit = crate::arch::user::enter(image.entry(), stack_top);
 
+    CURRENT_PID.store(0, Ordering::SeqCst);
     crate::mm::activate_address_space(kernel_space).expect("failed to restore kernel CR3");
     assert_eq!(crate::mm::active_address_space(), kernel_space);
 
@@ -145,9 +162,40 @@ pub fn processes() -> Vec<ProcessInfo> {
             state: process.state,
             entry: process.entry,
             cr3: process.cr3,
+            fd_count: process.fds.iter().flatten().count(),
             exit_code: process.exit_code,
         })
         .collect()
+}
+
+pub fn write_current_fd(fd: u64, data: &[u8]) -> Result<usize, &'static str> {
+    let pid = CURRENT_PID.load(Ordering::SeqCst);
+    if pid == 0 {
+        return Err("no current userspace process");
+    }
+
+    let kind = {
+        let processes = PROCESSES.lock();
+        let process = processes
+            .iter()
+            .find(|process| process.pid == pid && process.state == ProcessState::Running)
+            .ok_or("current process is not runnable")?;
+        let index = usize::try_from(fd).map_err(|_| "file descriptor out of range")?;
+        process
+            .fds
+            .get(index)
+            .copied()
+            .flatten()
+            .ok_or("bad file descriptor")?
+    };
+
+    match kind {
+        FdKind::Stdout | FdKind::Stderr => {
+            crate::arch::serial::write_bytes(data);
+            Ok(data.len())
+        }
+        FdKind::Stdin => Err("file descriptor is not writable"),
+    }
 }
 
 fn load_image(

@@ -734,15 +734,26 @@ fn processes(console: &mut Console<'_>) {
             Some(code) => {
                 let _ = writeln!(
                     console,
-                    "  pid={:<3} {:<12} {:<7} entry={:#x} cr3={:#x} exit={}",
-                    process.pid, process.name, state, process.entry, process.cr3, code
+                    "  pid={:<3} {:<12} {:<7} entry={:#x} cr3={:#x} fds={} exit={}",
+                    process.pid,
+                    process.name,
+                    state,
+                    process.entry,
+                    process.cr3,
+                    process.fd_count,
+                    code
                 );
             }
             None => {
                 let _ = writeln!(
                     console,
-                    "  pid={:<3} {:<12} {:<7} entry={:#x} cr3={:#x}",
-                    process.pid, process.name, state, process.entry, process.cr3
+                    "  pid={:<3} {:<12} {:<7} entry={:#x} cr3={:#x} fds={}",
+                    process.pid,
+                    process.name,
+                    state,
+                    process.entry,
+                    process.cr3,
+                    process.fd_count
                 );
             }
         }

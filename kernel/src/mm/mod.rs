@@ -2,6 +2,7 @@ pub mod heap;
 
 pub use crate::arch::memory::AddressSpace;
 
+use alloc::vec::Vec;
 use bootloader_api::{info::MemoryRegionKind, BootInfo};
 use core::sync::atomic::{AtomicU64, Ordering};
 use kernel_core::{PhysicalMemory, Region, PAGE_SIZE};
@@ -198,6 +199,34 @@ pub fn map_user_page(
         executable,
         initial,
     )
+}
+
+pub fn copy_from_user(
+    address: u64,
+    length: usize,
+    maximum: usize,
+) -> Result<Vec<u8>, &'static str> {
+    if length > maximum {
+        return Err("userspace buffer exceeds syscall limit");
+    }
+    if length == 0 {
+        return Ok(Vec::new());
+    }
+
+    let offset = (*PHYSICAL_MEMORY_OFFSET.lock()).ok_or("physical memory is not initialized")?;
+    if !crate::arch::memory::user_range_accessible(offset, address, length, false) {
+        return Err("invalid userspace read buffer");
+    }
+
+    let mut data = Vec::with_capacity(length);
+    // SAFETY: every page in the range was verified PRESENT + USER_ACCESSIBLE
+    // in the currently active process CR3. Syscall entry masks interrupts and
+    // Generic is single-CPU, so the mapping cannot change during this copy.
+    unsafe {
+        let source = core::slice::from_raw_parts(address as *const u8, length);
+        data.extend_from_slice(source);
+    }
+    Ok(data)
 }
 
 pub fn stats() -> MemoryStats {
