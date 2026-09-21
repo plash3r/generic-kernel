@@ -65,7 +65,7 @@ pub fn take_ownership<const N: usize>(offset: u64, pmm: &mut PhysicalMemory<N>) 
     );
     let (old_root, cache_flags) = Cr3::read();
     let before = pmm.free_bytes();
-    let owned = clone_root::<1024>(
+    let owned = clone_root::<16384>(
         &mut BootTables { offset, pmm },
         old_root.start_address().as_u64(),
     )

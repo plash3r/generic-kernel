@@ -14,7 +14,8 @@ mapping edits modify the bootloader tables.
 3. Check PMM accounting, disable global TLB caching temporarily and load the new
    CR3. Restore CR4 and enable CR0.WP so supervisor writes respect read-only pages.
 4. Map the existing RW+NX heap and verify its allocation and guard pages.
-5. Continue normal Recontrol/storage/console boot validation.
+5. Continue storage/console boot validation. The existing Recontrol ABI probe
+   has already run before memory initialization.
 
 The success marker is `[ok] Generic-owned CR3 ...`. Every disk/ISO/storage smoke
 run must observe it and reach `GENERIC: READY` with QEMU's success exit code.
@@ -23,8 +24,10 @@ run must observe it and reach `GENERIC: READY` with QEMU's success exit code.
 
 - All table allocation is completed before activation. Exhaustion, malformed
   huge-page entries, recursive mappings and allocation-limit failures release
-  the clone's frames in reverse allocation order, leaving the source unchanged.
-- Cloning uses fixed scratch metadata, no heap, and a limit of 1024 table frames.
+  the clone's partial tree from children to parents, leaving the source unchanged.
+- Cloning uses the partial destination tree as its allocation journal: no heap
+  and stack usage bounded by four levels, even for broad firmware direct maps.
+  The table-frame budget is 16384 (64 MiB); PMM exhaustion also rolls back.
   The adapter trusts the active bootloader tables and physical direct map; it
   is not a parser for untrusted page-table data.
 - Four-level paging, one CPU and disabled interrupts are required. Bootstrap

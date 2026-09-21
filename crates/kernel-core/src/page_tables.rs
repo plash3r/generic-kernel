@@ -37,29 +37,13 @@ pub fn clone_root<const LIMIT: usize>(
     memory: &mut impl TableMemory,
     source: u64,
 ) -> Result<OwnedRoot, CloneError> {
-    let mut allocated = [0u64; LIMIT];
     let mut count = 0;
     let mut ancestors = [0u64; 4];
-    let result = clone_table(
-        memory,
-        source,
-        4,
-        &mut ancestors,
-        &mut allocated,
-        &mut count,
-    );
-    match result {
-        Ok(physical) => Ok(OwnedRoot {
-            physical,
-            table_frames: count,
-        }),
-        Err(error) => {
-            for frame in allocated[..count].iter().rev() {
-                memory.release(*frame);
-            }
-            Err(error)
-        }
-    }
+    let physical = clone_table::<LIMIT>(memory, source, 4, &mut ancestors, &mut count)?;
+    Ok(OwnedRoot {
+        physical,
+        table_frames: count,
+    })
 }
 
 fn clone_table<const LIMIT: usize>(
@@ -67,7 +51,6 @@ fn clone_table<const LIMIT: usize>(
     source: u64,
     level: usize,
     ancestors: &mut [u64; 4],
-    allocated: &mut [u64; LIMIT],
     count: &mut usize,
 ) -> Result<u64, CloneError> {
     if source == 0 || source & !ADDRESS != 0 {
@@ -82,39 +65,57 @@ fn clone_table<const LIMIT: usize>(
         return Err(CloneError::TableLimit);
     }
     let destination = memory.allocate().ok_or(CloneError::OutOfMemory)?;
-    allocated[*count] = destination;
     *count += 1;
     if destination == 0 || destination & !ADDRESS != 0 {
+        memory.release(destination);
         return Err(CloneError::InvalidFrame);
     }
+    // The partial destination itself is the allocation journal. A child is
+    // linked only after its entire subtree succeeds. This keeps stack usage
+    // proportional to paging depth, not to the number of copied tables.
     for index in 0..512 {
-        let entry = memory.read(source, index);
-        let mut replacement = entry;
-        if entry & PRESENT != 0 && level > 1 {
-            if entry & HUGE != 0 {
-                if level == 4 {
-                    return Err(CloneError::InvalidHugePage);
+        memory.write(destination, index, 0);
+    }
+    let result = (|| {
+        for index in 0..512 {
+            let entry = memory.read(source, index);
+            let mut replacement = entry;
+            if entry & PRESENT != 0 && level > 1 {
+                if entry & HUGE != 0 {
+                    if level == 4 {
+                        return Err(CloneError::InvalidHugePage);
+                    }
+                    // For large leaves bit 12 is PAT, not an address bit.
+                    let reserved = if level == 3 { 0x3fff_e000 } else { 0x1f_e000 };
+                    if entry & reserved != 0 {
+                        return Err(CloneError::InvalidHugePage);
+                    }
+                } else {
+                    let child =
+                        clone_table::<LIMIT>(memory, entry & ADDRESS, level - 1, ancestors, count)?;
+                    replacement = (entry & !ADDRESS) | child;
                 }
-                // For large leaves bit 12 is PAT, not an address bit.
-                let reserved = if level == 3 { 0x3fff_e000 } else { 0x1f_e000 };
-                if entry & reserved != 0 {
-                    return Err(CloneError::InvalidHugePage);
-                }
-            } else {
-                let child = clone_table(
-                    memory,
-                    entry & ADDRESS,
-                    level - 1,
-                    ancestors,
-                    allocated,
-                    count,
-                )?;
-                replacement = (entry & !ADDRESS) | child;
+            }
+            memory.write(destination, index, replacement);
+        }
+        Ok(destination)
+    })();
+    if result.is_err() {
+        release_tree(memory, destination, level);
+    }
+    result
+}
+
+fn release_tree(memory: &mut impl TableMemory, frame: u64, level: usize) {
+    if level > 1 {
+        for index in 0..512 {
+            let entry = memory.read(frame, index);
+            if entry & PRESENT != 0 && entry & HUGE == 0 {
+                release_tree(memory, entry & ADDRESS, level - 1);
             }
         }
-        memory.write(destination, index, replacement);
     }
-    Ok(destination)
+    memory.release(frame);
 }
 
 #[cfg(test)]
@@ -145,7 +146,7 @@ mod tests {
             tables.get_mut(&0x4000).unwrap()[8] = 0xdead_0000; // non-present metadata
             Self {
                 tables,
-                next: 0x10_0000,
+                next: 0x1000_0000,
                 budget: usize::MAX,
             }
         }
@@ -159,7 +160,7 @@ mod tests {
             self.budget -= 1;
             let frame = self.next;
             self.next += 4096;
-            assert!(self.tables.insert(frame, [0; 512]).is_none());
+            assert!(self.tables.insert(frame, [u64::MAX; 512]).is_none());
             Some(frame)
         }
         fn release(&mut self, frame: u64) {
@@ -234,6 +235,36 @@ mod tests {
             assert_eq!(clone_root::<16>(&mut memory, 0x1000).unwrap_err(), expected);
             assert_eq!(memory.tables, original);
         }
+    }
+
+    #[test]
+    fn broad_direct_map_exceeds_old_limit_and_rolls_back_completed_siblings() {
+        let mut memory = Memory::fixture();
+        memory.tables.clear();
+        memory.tables.insert(0x1000, [0; 512]);
+        for branch in 0..2u64 {
+            let l3 = (2 + branch) * 4096;
+            memory.tables.insert(l3, [0; 512]);
+            memory.write(0x1000, branch as usize, l3 | 3);
+            for index in 0..512u64 {
+                let l2 = (4 + branch * 512 + index) * 4096;
+                memory.tables.insert(l2, [0x83; 512]);
+                memory.write(l3, index as usize, l2 | 3);
+            }
+        }
+        let original = memory.tables.clone();
+        assert_eq!(
+            clone_root::<1024>(&mut memory, 0x1000).unwrap_err(),
+            CloneError::TableLimit
+        );
+        assert_eq!(memory.tables, original);
+        let root = clone_root::<16384>(&mut memory, 0x1000).unwrap();
+        assert_eq!(root.table_frames, 1027);
+        for (frame, table) in &original {
+            assert_eq!(&memory.tables[frame], table);
+        }
+        release_tree(&mut memory, root.physical, 4);
+        assert_eq!(memory.tables, original);
     }
 
     #[test]
