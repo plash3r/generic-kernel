@@ -10,6 +10,7 @@ pub mod platform;
 pub mod ps2;
 pub mod serial;
 pub mod timer;
+pub mod user;
 pub mod virtio_blk;
 
 pub fn halt() -> ! {

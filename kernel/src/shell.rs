@@ -374,6 +374,25 @@ fn kernel_diagnostics(console: &mut Console<'_>) {
         summary.fail(console, format_args!("kernel scheduler is not initialized"));
     }
 
+    let user = crate::arch::user::diagnostics();
+    if user.probe_ok && user.last_cpl == 3 {
+        summary.ok(
+            console,
+            format_args!(
+                "ring3/syscall boundary: CPL{}, last userspace ticks={}",
+                user.last_cpl, user.last_exit
+            ),
+        );
+    } else {
+        summary.fail(
+            console,
+            format_args!(
+                "ring3/syscall probe invalid: ok={} cpl={}",
+                user.probe_ok, user.last_cpl
+            ),
+        );
+    }
+
     match crate::arch::ps2::diagnostics() {
         Some(input) if input.keyboard && input.mouse => {
             summary.ok(

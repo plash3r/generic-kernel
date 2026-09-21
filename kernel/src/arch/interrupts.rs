@@ -9,12 +9,13 @@ use x86_64::{
         idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
         tss::TaskStateSegment,
     },
-    VirtAddr,
+    PrivilegeLevel, VirtAddr,
 };
 
 pub const TIMER_VECTOR: u8 = 0x40;
 pub const KEYBOARD_VECTOR: u8 = 0x41;
 pub const MOUSE_VECTOR: u8 = 0x42;
+pub const SYSCALL_VECTOR: u8 = 0x80;
 const SPURIOUS_VECTOR: u8 = 0xff;
 
 const DOUBLE_FAULT_IST: u16 = 0;
@@ -28,11 +29,25 @@ static mut FAULT_STACK: Stack = Stack {
     _bytes: [0; 32 * 1024],
 };
 
+#[repr(align(16))]
+struct PrivilegeStack {
+    _bytes: [u8; 64 * 1024],
+}
+
+static mut PRIVILEGE_STACK: PrivilegeStack = PrivilegeStack {
+    _bytes: [0; 64 * 1024],
+};
+
 static TSS: Lazy<TaskStateSegment> = Lazy::new(|| {
     let mut tss = TaskStateSegment::new();
     let start = core::ptr::addr_of_mut!(FAULT_STACK) as u64;
     tss.interrupt_stack_table[DOUBLE_FAULT_IST as usize] =
         VirtAddr::new(start + core::mem::size_of::<Stack>() as u64);
+
+    let privilege_start = core::ptr::addr_of_mut!(PRIVILEGE_STACK) as u64;
+    tss.privilege_stack_table[0] = VirtAddr::new(
+        privilege_start + core::mem::size_of::<PrivilegeStack>() as u64,
+    );
     tss
 });
 
@@ -41,12 +56,16 @@ static GDT: Lazy<(
     SegmentSelector,
     SegmentSelector,
     SegmentSelector,
+    SegmentSelector,
+    SegmentSelector,
 )> = Lazy::new(|| {
     let mut gdt = GlobalDescriptorTable::new();
     let code = gdt.append(Descriptor::kernel_code_segment());
     let data = gdt.append(Descriptor::kernel_data_segment());
+    let user_data = gdt.append(Descriptor::user_data_segment());
+    let user_code = gdt.append(Descriptor::user_code_segment());
     let tss = gdt.append(Descriptor::tss_segment(&TSS));
-    (gdt, code, data, tss)
+    (gdt, code, data, user_code, user_data, tss)
 });
 
 static IDT: Lazy<InterruptDescriptorTable> = Lazy::new(|| {
@@ -66,6 +85,13 @@ static IDT: Lazy<InterruptDescriptorTable> = Lazy::new(|| {
     idt[TIMER_VECTOR].set_handler_fn(timer_interrupt);
     idt[KEYBOARD_VECTOR].set_handler_fn(keyboard_interrupt);
     idt[MOUSE_VECTOR].set_handler_fn(mouse_interrupt);
+    // SAFETY: generic_int80_entry preserves the full interrupted register set,
+    // follows the x86 interrupt-frame contract and returns with IRETQ.
+    unsafe {
+        idt[SYSCALL_VECTOR]
+            .set_handler_addr(crate::arch::user::syscall_entry_address())
+            .set_privilege_level(PrivilegeLevel::Ring3);
+    }
     idt[SPURIOUS_VECTOR].set_handler_fn(spurious_interrupt);
     idt
 });
@@ -78,9 +104,15 @@ pub fn init() {
         DS::set_reg(GDT.2);
         ES::set_reg(GDT.2);
         SS::set_reg(GDT.2);
-        load_tss(GDT.3);
+        load_tss(GDT.5);
     }
     IDT.load();
+}
+
+pub fn user_selectors() -> (u16, u16) {
+    let code = (GDT.3.index() << 3) | PrivilegeLevel::Ring3 as u16;
+    let data = (GDT.4.index() << 3) | PrivilegeLevel::Ring3 as u16;
+    (code, data)
 }
 
 extern "x86-interrupt" fn timer_interrupt(_frame: InterruptStackFrame) {

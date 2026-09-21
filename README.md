@@ -29,6 +29,8 @@ The x86_64 path provides a no_std Rust kernel with:
 - interrupt-routed PIT 100 Hz system timer;
 - cooperative round-robin kernel scheduler with dedicated stacks, sleep/wake,
   timer-driven reschedule requests and runtime task diagnostics;
+- first ring 3 boundary: user GDT/TSS state, USER_ACCESSIBLE RX/RW+NX pages and
+  an int 0x80 syscall probe that returns safely to the kernel;
 - interrupt-driven PS/2 keyboard and mouse event queues with wheel detection;
 - runtime-switchable framebuffer fonts: Noto Sans Mono presets plus custom PSF2 loading from VFS;
 - generated initramfs unpacked into the writable ramfs root;
@@ -49,6 +51,7 @@ A successful memory bring-up includes diagnostics similar to:
     [ok] xAPIC id=... + ... IOAPIC(s), IRQ0/1/12 routed
     [ok] interrupt event loop + PIT timer 100 Hz (... ticks)
     [ok] scheduler context switch: ... switches, ... task(s)
+    [ok] ring3 syscall probe: CPL3, ticks=..., int 0x80 exit
     [ok] framebuffer console smoke
 
 ## Build a VirtualBox ISO
@@ -190,6 +193,6 @@ The protected-memory stage still needs full kernel-section W^X enforcement and
 richer fault coverage. Graphical-shell development now lives in the separate `plash3r/generic-gui`
 repository. The kernel keeps framebuffer, input, timer and future userspace/IPC
 mechanisms, but not the desktop/window manager itself. The next kernel stages
-harden the scheduler with IRQ preemption/SMP, then add ring 3, syscalls,
-user ELF loading, IPC/shared memory,
+harden the scheduler with IRQ preemption/SMP, then turn the validated ring 3/syscall probe into isolated process address
+spaces with ELF loading, followed by IPC/shared memory,
 production-grade storage drivers/filesystem recovery, USB HID and networking.

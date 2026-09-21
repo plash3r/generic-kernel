@@ -17,8 +17,10 @@
    stacks, context switching, sleeping, timer-driven reschedule requests and
    scheduler diagnostics are working. Remaining: hard IRQ preemption, SMP,
    per-CPU run queues/state and synchronization.
-5. Isolation: ring 3, separate address spaces, syscalls, user-pointer checking,
-   ELF loader and init process.
+5. Isolation — in progress: DPL3 GDT segments, TSS RSP0, USER_ACCESSIBLE
+   RX/RW+NX pages and a validated int 0x80 syscall boundary are working.
+   Remaining: per-process address spaces, process lifecycle, user-pointer
+   checking beyond the probe, ELF loader and init process.
 6. Recontrol userspace runtime: no_std Generic runtime, stable syscall ABI,
    process exit, byte/string output, allocation and panic path.
 7. Storage — working foundation: generic VFS, generated initramfs, block-device

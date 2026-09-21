@@ -39,7 +39,7 @@ prints a compact combined view of:
 
 runs non-destructive runtime self-checks across the active kernel. The command
 checks PMM/heap accounting, APIC/IOAPIC state, the advancing system timer,
-kernel scheduler/context switching, PS/2 keyboard/mouse status, the live CR3 and supervisor write-protect bit, heap
+kernel scheduler/context switching, ring3/syscall boundary, PS/2 keyboard/mouse status, the live CR3 and supervisor write-protect bit, heap
 mapping and guard pages, framebuffer/font geometry, VFS/initramfs access,
 GenericFS persistence when mounted, and the Recontrol freestanding ABI.
 

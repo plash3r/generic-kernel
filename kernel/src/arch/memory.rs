@@ -181,6 +181,73 @@ pub fn map_mmio<const N: usize>(
     Ok(())
 }
 
+pub fn map_user_page<const N: usize>(
+    physical_memory_offset: u64,
+    pmm: &mut PhysicalMemory<N>,
+    virtual_address: u64,
+    writable: bool,
+    executable: bool,
+    initial: &[u8],
+) -> Result<u64, &'static str> {
+    if virtual_address % PAGE_SIZE != 0 {
+        return Err("user virtual address must be page aligned");
+    }
+    if initial.len() > PAGE_SIZE as usize {
+        return Err("initial user page data exceeds one page");
+    }
+
+    let physical_offset = VirtAddr::new(physical_memory_offset);
+    // SAFETY: Generic owns the active table tree and the direct map covers all
+    // page-table and newly allocated user frames.
+    let mut mapper = unsafe { current_offset_page_table(physical_offset) };
+    let page = Page::<Size4KiB>::from_start_address(VirtAddr::new(virtual_address))
+        .map_err(|_| "unaligned user page")?;
+    if mapper.translate_addr(page.start_address()).is_some() {
+        return Err("user virtual page is already mapped");
+    }
+
+    let mut allocator = PmmFrameAllocator::new(pmm);
+    let physical = allocator
+        .allocate_physical()
+        .ok_or("out of physical memory for user page")?;
+    zero_physical_frame(physical_memory_offset, physical);
+
+    if !initial.is_empty() {
+        let direct = physical_memory_offset
+            .checked_add(physical)
+            .ok_or("user direct-map address overflow")?;
+        // SAFETY: the newly allocated physical frame is uniquely owned and
+        // initial.len() was checked to fit inside the page.
+        unsafe {
+            core::ptr::copy_nonoverlapping(
+                initial.as_ptr(),
+                VirtAddr::new(direct).as_mut_ptr::<u8>(),
+                initial.len(),
+            );
+        }
+    }
+
+    let mut flags = PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE;
+    if writable {
+        flags |= PageTableFlags::WRITABLE;
+    }
+    if !executable {
+        flags |= PageTableFlags::NO_EXECUTE;
+    }
+
+    let frame = PhysFrame::<Size4KiB>::containing_address(PhysAddr::new(physical));
+    // SAFETY: the page is confirmed unmapped, the frame is uniquely allocated
+    // from PMM and USER_ACCESSIBLE is intentional for this mapping.
+    unsafe {
+        mapper
+            .map_to(page, frame, flags, &mut allocator)
+            .map_err(|_| "failed to map user page")?
+            .flush();
+    }
+
+    Ok(physical)
+}
+
 pub struct HeapMapping {
     pub mapped_pages: u64,
     pub page_table_and_heap_frames: u64,

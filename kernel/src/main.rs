@@ -60,6 +60,8 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
     #[cfg(feature = "smoke")]
     task::smoke_test();
 
+    arch::user::probe();
+
     x86_64::instructions::interrupts::int3();
     log!("[ok] breakpoint returned\n");
     log!("GENERIC: READY\n");

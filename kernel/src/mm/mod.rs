@@ -156,6 +156,27 @@ pub fn runtime_diagnostics() -> Option<crate::arch::memory::RuntimeMemoryDiagnos
     ))
 }
 
+pub fn map_user_page(
+    virtual_address: u64,
+    writable: bool,
+    executable: bool,
+    initial: &[u8],
+) -> Result<u64, &'static str> {
+    let offset = (*PHYSICAL_MEMORY_OFFSET.lock()).ok_or("physical memory is not initialized")?;
+    let mut physical = PHYSICAL_MEMORY.lock();
+    let pmm = physical
+        .as_mut()
+        .ok_or("physical memory manager is not initialized")?;
+    crate::arch::memory::map_user_page(
+        offset,
+        pmm,
+        virtual_address,
+        writable,
+        executable,
+        initial,
+    )
+}
+
 pub fn stats() -> MemoryStats {
     let physical = PHYSICAL_MEMORY.lock();
     let Some(pmm) = physical.as_ref() else {
