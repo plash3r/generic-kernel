@@ -2,6 +2,7 @@ pub mod heap;
 
 use bootloader_api::{info::MemoryRegionKind, BootInfo};
 use kernel_core::{PhysicalMemory, Region, PAGE_SIZE};
+use core::sync::atomic::{AtomicU64, Ordering};
 use spin::Mutex;
 use x86_64::VirtAddr;
 
@@ -9,7 +10,9 @@ const MAX_BOOT_REGIONS: usize = 256;
 const PMM_REGION_CAPACITY: usize = 512;
 
 pub const HEAP_START: u64 = 0x0000_4444_0000_0000;
-pub const HEAP_SIZE: u64 = 2 * 1024 * 1024;
+pub const HEAP_SIZE: u64 = 16 * 1024 * 1024;
+const MMIO_START: u64 = 0x0000_5555_0000_0000;
+static NEXT_MMIO: AtomicU64 = AtomicU64::new(MMIO_START);
 
 static PHYSICAL_MEMORY: Mutex<Option<PhysicalMemory<PMM_REGION_CAPACITY>>> = Mutex::new(None);
 static PHYSICAL_MEMORY_OFFSET: Mutex<Option<u64>> = Mutex::new(None);
@@ -120,6 +123,37 @@ pub fn init(info: &BootInfo) {
     let mut global = PHYSICAL_MEMORY.lock();
     assert!(global.is_none(), "physical memory initialized twice");
     *global = Some(pmm);
+}
+
+pub fn physical_memory_offset() -> Option<u64> {
+    *PHYSICAL_MEMORY_OFFSET.lock()
+}
+
+pub fn map_mmio(physical: u64, bytes: u64) -> Option<u64> {
+    if bytes == 0 {
+        return None;
+    }
+
+    let physical_page = physical & !(PAGE_SIZE - 1);
+    let page_offset = physical - physical_page;
+    let span = page_offset.checked_add(bytes)?;
+    let pages = span.checked_add(PAGE_SIZE - 1)? / PAGE_SIZE;
+    let bytes_rounded = pages.checked_mul(PAGE_SIZE)?;
+    let virtual_start = NEXT_MMIO.fetch_add(bytes_rounded, Ordering::SeqCst);
+    let offset = (*PHYSICAL_MEMORY_OFFSET.lock())?;
+
+    let mut physical_memory = PHYSICAL_MEMORY.lock();
+    let pmm = physical_memory.as_mut()?;
+    crate::arch::memory::map_mmio(
+        offset,
+        pmm,
+        virtual_start,
+        physical_page,
+        pages,
+    )
+    .ok()?;
+
+    virtual_start.checked_add(page_offset)
 }
 
 pub fn runtime_diagnostics() -> Option<crate::arch::memory::RuntimeMemoryDiagnostics> {

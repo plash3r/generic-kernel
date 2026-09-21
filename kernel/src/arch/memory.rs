@@ -129,6 +129,61 @@ pub fn runtime_diagnostics(
     }
 }
 
+pub fn map_mmio<const N: usize>(
+    physical_memory_offset: u64,
+    pmm: &mut PhysicalMemory<N>,
+    virtual_start: u64,
+    physical_start: u64,
+    pages: u64,
+) -> Result<(), &'static str> {
+    if pages == 0
+        || virtual_start % PAGE_SIZE != 0
+        || physical_start % PAGE_SIZE != 0
+    {
+        return Err("MMIO mapping must be non-empty and page aligned");
+    }
+
+    let physical_offset = VirtAddr::new(physical_memory_offset);
+    // SAFETY: Generic owns the active table tree and the direct map gives access
+    // to all page-table frames used by the mapper.
+    let mut mapper = unsafe { current_offset_page_table(physical_offset) };
+    let mut allocator = PmmFrameAllocator::new(pmm);
+    let flags = PageTableFlags::PRESENT
+        | PageTableFlags::WRITABLE
+        | PageTableFlags::NO_EXECUTE
+        | PageTableFlags::NO_CACHE
+        | PageTableFlags::WRITE_THROUGH;
+
+    for index in 0..pages {
+        let virtual_address = virtual_start
+            .checked_add(index * PAGE_SIZE)
+            .ok_or("MMIO virtual-address overflow")?;
+        let physical_address = physical_start
+            .checked_add(index * PAGE_SIZE)
+            .ok_or("MMIO physical-address overflow")?;
+        let page = Page::<Size4KiB>::from_start_address(VirtAddr::new(virtual_address))
+            .map_err(|_| "unaligned MMIO virtual page")?;
+        let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(physical_address))
+            .map_err(|_| "unaligned MMIO physical frame")?;
+
+        if mapper.translate_addr(page.start_address()).is_some() {
+            return Err("MMIO virtual range is already mapped");
+        }
+
+        // SAFETY: the virtual page was checked unused, the physical frame is an
+        // explicitly requested device MMIO frame, and page-table allocations are
+        // sourced from Generic's PMM.
+        unsafe {
+            mapper
+                .map_to(page, frame, flags, &mut allocator)
+                .map_err(|_| "failed to map MMIO page")?
+                .flush();
+        }
+    }
+
+    Ok(())
+}
+
 pub struct HeapMapping {
     pub mapped_pages: u64,
     pub page_table_and_heap_frames: u64,

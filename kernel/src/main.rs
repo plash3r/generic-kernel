@@ -51,6 +51,10 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
     };
     vfs::init(block_device);
 
+    // Discover ACPI interrupt topology, install xAPIC/IOAPIC routing, initialize
+    // PS/2 event queues and start the first Generic system timer.
+    arch::platform::init(info);
+
     x86_64::instructions::interrupts::int3();
     log!("[ok] breakpoint returned\n");
     log!("GENERIC: READY\n");

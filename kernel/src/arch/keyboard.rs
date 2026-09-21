@@ -1,10 +1,70 @@
-use x86_64::instructions::port::Port;
+use spin::Mutex;
+
+const QUEUE_CAPACITY: usize = 256;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Key {
     Char(u8),
     Enter,
     Backspace,
+    Escape,
+    F12,
+    ArrowUp,
+    ArrowDown,
+    ArrowLeft,
+    ArrowRight,
+}
+
+struct ScancodeQueue {
+    bytes: [u8; QUEUE_CAPACITY],
+    read: usize,
+    write: usize,
+    len: usize,
+}
+
+impl ScancodeQueue {
+    const fn new() -> Self {
+        Self {
+            bytes: [0; QUEUE_CAPACITY],
+            read: 0,
+            write: 0,
+            len: 0,
+        }
+    }
+
+    fn push(&mut self, byte: u8) {
+        if self.len == QUEUE_CAPACITY {
+            self.read = (self.read + 1) % QUEUE_CAPACITY;
+            self.len -= 1;
+        }
+        self.bytes[self.write] = byte;
+        self.write = (self.write + 1) % QUEUE_CAPACITY;
+        self.len += 1;
+    }
+
+    fn pop(&mut self) -> Option<u8> {
+        if self.len == 0 {
+            return None;
+        }
+        let byte = self.bytes[self.read];
+        self.read = (self.read + 1) % QUEUE_CAPACITY;
+        self.len -= 1;
+        Some(byte)
+    }
+
+    fn clear(&mut self) {
+        self.read = 0;
+        self.write = 0;
+        self.len = 0;
+    }
+}
+
+static SCANCODES: Mutex<ScancodeQueue> = Mutex::new(ScancodeQueue::new());
+
+pub fn interrupt() {
+    if let Some(code) = crate::arch::ps2::read_interrupt_data(false) {
+        SCANCODES.lock().push(code);
+    }
 }
 
 pub struct Keyboard {
@@ -23,42 +83,46 @@ impl Keyboard {
     }
 
     pub fn drain(&mut self) {
-        for _ in 0..64 {
-            if !self.data_ready() {
-                break;
+        x86_64::instructions::interrupts::without_interrupts(|| SCANCODES.lock().clear());
+    }
+
+    pub fn poll_key(&mut self) -> Option<Key> {
+        loop {
+            let code =
+                x86_64::instructions::interrupts::without_interrupts(|| SCANCODES.lock().pop())?;
+            if let Some(key) = self.decode_scancode(code) {
+                return Some(key);
             }
-            let _ = self.read_scancode();
         }
     }
 
     pub fn read_key_blocking(&mut self) -> Key {
         loop {
-            if !self.data_ready() {
-                core::hint::spin_loop();
-                continue;
-            }
-            if let Some(key) = self.read_scancode() {
+            if let Some(key) = self.poll_key() {
                 return key;
             }
+            x86_64::instructions::hlt();
         }
     }
 
-    fn data_ready(&self) -> bool {
-        // SAFETY: port 0x64 is the standard i8042 status register.
-        unsafe { Port::<u8>::new(0x64).read() & 0x01 != 0 }
-    }
-
-    fn read_scancode(&mut self) -> Option<Key> {
-        // SAFETY: status bit 0 was checked before reading the i8042 data port.
-        let code = unsafe { Port::<u8>::new(0x60).read() };
-
+    fn decode_scancode(&mut self, code: u8) -> Option<Key> {
         if code == 0xe0 {
             self.extended = true;
             return None;
         }
+
         if self.extended {
             self.extended = false;
-            return None;
+            if code & 0x80 != 0 {
+                return None;
+            }
+            return match code {
+                0x48 => Some(Key::ArrowUp),
+                0x50 => Some(Key::ArrowDown),
+                0x4b => Some(Key::ArrowLeft),
+                0x4d => Some(Key::ArrowRight),
+                _ => None,
+            };
         }
 
         match code {
@@ -74,8 +138,10 @@ impl Keyboard {
                 self.caps_lock = !self.caps_lock;
                 return None;
             }
+            0x01 => return Some(Key::Escape),
             0x1c => return Some(Key::Enter),
             0x0e => return Some(Key::Backspace),
+            0x58 => return Some(Key::F12),
             _ if code & 0x80 != 0 => return None,
             _ => {}
         }

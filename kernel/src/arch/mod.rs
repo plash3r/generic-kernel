@@ -1,3 +1,9 @@
+pub mod timer;
+pub mod ps2;
+pub mod platform;
+pub mod mouse;
+pub mod apic;
+pub mod acpi;
 pub mod framebuffer;
 pub mod interrupts;
 pub mod keyboard;
