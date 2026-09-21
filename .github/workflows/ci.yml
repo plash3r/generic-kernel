@@ -1,0 +1,28 @@
+name: kernel
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: rustup show
+      - name: Format and core tests
+        run: |
+          cargo fmt --all -- --check
+          cargo test --locked -p kernel-core
+      - name: Emulator
+        run: sudo apt-get update && sudo apt-get install -y qemu-system-x86 ovmf
+      - name: Boot smoke test
+        run: |
+          bash scripts/build.sh smoke
+          python3 scripts/run.py --smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: boot-evidence
+          path: |
+            build/smoke.log
+            build/iron-smoke-uefi.img
