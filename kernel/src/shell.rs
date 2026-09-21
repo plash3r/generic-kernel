@@ -365,10 +365,7 @@ fn kernel_diagnostics(console: &mut Console<'_>) {
         Some(input) if input.keyboard && input.mouse => {
             summary.ok(
                 console,
-                format_args!(
-                    "PS/2 input: keyboard=true mouse=true wheel={}",
-                    input.wheel
-                ),
+                format_args!("PS/2 input: keyboard=true mouse=true wheel={}", input.wheel),
             );
         }
         Some(input) => {
