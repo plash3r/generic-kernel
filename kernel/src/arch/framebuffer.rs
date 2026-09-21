@@ -1,11 +1,19 @@
 use bootloader_api::info::{FrameBuffer, FrameBufferInfo, PixelFormat};
 use core::fmt;
+use noto_sans_mono_bitmap::{
+    get_raster, get_raster_width, FontWeight, RasterHeight, RasterizedChar,
+};
 
-const GLYPH_WIDTH: usize = 5;
-const GLYPH_HEIGHT: usize = 7;
-const SCALE: usize = 2;
-const CELL_WIDTH: usize = (GLYPH_WIDTH + 1) * SCALE;
-const CELL_HEIGHT: usize = (GLYPH_HEIGHT + 1) * SCALE;
+const FONT_WEIGHT: FontWeight = FontWeight::Regular;
+const FONT_HEIGHT: RasterHeight = RasterHeight::Size16;
+const GLYPH_WIDTH: usize = get_raster_width(FONT_WEIGHT, FONT_HEIGHT);
+const GLYPH_HEIGHT: usize = FONT_HEIGHT.val();
+const CELL_PADDING_X: usize = 1;
+const CELL_PADDING_Y: usize = 1;
+const CELL_WIDTH: usize = GLYPH_WIDTH + CELL_PADDING_X * 2;
+const CELL_HEIGHT: usize = GLYPH_HEIGHT + CELL_PADDING_Y * 2;
+
+const BACKGROUND: Color = Color::new(0x00, 0x00, 0x00);
 const DEFAULT_FG: Color = Color::new(0xe6, 0xed, 0xf3);
 const ACCENT: Color = Color::new(0x55, 0xd1, 0x7a);
 
@@ -19,6 +27,15 @@ struct Color {
 impl Color {
     const fn new(r: u8, g: u8, b: u8) -> Self {
         Self { r, g, b }
+    }
+
+    fn with_intensity(self, intensity: u8) -> Self {
+        let scale = intensity as u16;
+        Self {
+            r: ((self.r as u16 * scale) / 255) as u8,
+            g: ((self.g as u16 * scale) / 255) as u8,
+            b: ((self.b as u16 * scale) / 255) as u8,
+        }
     }
 }
 
@@ -68,7 +85,7 @@ impl<'a> Console<'a> {
     }
 
     pub fn clear(&mut self) {
-        self.buffer.fill(0);
+        self.fill_background();
         self.column = 0;
         self.row = 0;
     }
@@ -77,18 +94,8 @@ impl<'a> Console<'a> {
         match byte {
             b'\n' => self.newline(),
             b'\r' => self.column = 0,
-            b'\t' => {
-                for _ in 0..4 {
-                    self.write_byte(b' ');
-                }
-            }
-            0x20..=0x7e => {
-                if self.column >= self.columns {
-                    self.newline();
-                }
-                self.draw_glyph(byte, self.column * CELL_WIDTH, self.row * CELL_HEIGHT);
-                self.column += 1;
-            }
+            b'\t' => self.write_tab(),
+            0x20..=0x7e => self.write_character(byte as char),
             _ => {}
         }
     }
@@ -103,6 +110,33 @@ impl<'a> Console<'a> {
             return;
         }
         self.clear_cell(self.column, self.row);
+    }
+
+    fn write_character(&mut self, character: char) {
+        match character {
+            '\n' => self.newline(),
+            '\r' => self.column = 0,
+            '\t' => self.write_tab(),
+            character if !character.is_control() => {
+                if self.column >= self.columns {
+                    self.newline();
+                }
+                self.draw_glyph(
+                    character,
+                    self.column * CELL_WIDTH,
+                    self.row * CELL_HEIGHT,
+                );
+                self.column += 1;
+            }
+            _ => {}
+        }
+    }
+
+    fn write_tab(&mut self) {
+        let spaces = 4 - (self.column % 4);
+        for _ in 0..spaces {
+            self.write_character(' ');
+        }
     }
 
     fn newline(&mut self) {
@@ -133,32 +167,44 @@ impl<'a> Console<'a> {
         self.row = self.rows.saturating_sub(1);
     }
 
+    fn fill_background(&mut self) {
+        if BACKGROUND.r == 0 && BACKGROUND.g == 0 && BACKGROUND.b == 0 {
+            self.buffer.fill(0);
+            return;
+        }
+
+        for y in 0..self.info.height {
+            for x in 0..self.info.width {
+                self.write_pixel(x, y, BACKGROUND);
+            }
+        }
+    }
+
     fn clear_cell(&mut self, column: usize, row: usize) {
         let start_x = column * CELL_WIDTH;
         let start_y = row * CELL_HEIGHT;
         for y in start_y..(start_y + CELL_HEIGHT).min(self.info.height) {
             for x in start_x..(start_x + CELL_WIDTH).min(self.info.width) {
-                self.write_pixel(x, y, Color::new(0, 0, 0));
+                self.write_pixel(x, y, BACKGROUND);
             }
         }
     }
 
-    fn draw_glyph(&mut self, byte: u8, origin_x: usize, origin_y: usize) {
-        let rows = glyph(byte);
-        for (glyph_y, bits) in rows.iter().enumerate() {
-            for glyph_x in 0..GLYPH_WIDTH {
-                if bits & (1 << (GLYPH_WIDTH - 1 - glyph_x)) == 0 {
+    fn draw_glyph(&mut self, character: char, origin_x: usize, origin_y: usize) {
+        let raster = glyph(character);
+        debug_assert_eq!(raster.width(), GLYPH_WIDTH);
+        debug_assert_eq!(raster.height(), GLYPH_HEIGHT);
+
+        for (glyph_y, row) in raster.raster().iter().enumerate() {
+            for (glyph_x, intensity) in row.iter().copied().enumerate() {
+                if intensity == 0 {
                     continue;
                 }
-                for scale_y in 0..SCALE {
-                    for scale_x in 0..SCALE {
-                        self.write_pixel(
-                            origin_x + glyph_x * SCALE + scale_x,
-                            origin_y + glyph_y * SCALE + scale_y,
-                            self.foreground,
-                        );
-                    }
-                }
+                self.write_pixel(
+                    origin_x + CELL_PADDING_X + glyph_x,
+                    origin_y + CELL_PADDING_Y + glyph_y,
+                    self.foreground.with_intensity(intensity),
+                );
             }
         }
     }
@@ -201,81 +247,15 @@ impl<'a> Console<'a> {
 
 impl fmt::Write for Console<'_> {
     fn write_str(&mut self, text: &str) -> fmt::Result {
-        for byte in text.bytes() {
-            self.write_byte(byte);
+        for character in text.chars() {
+            self.write_character(character);
         }
         Ok(())
     }
 }
 
-fn glyph(byte: u8) -> [u8; GLYPH_HEIGHT] {
-    match byte.to_ascii_uppercase() {
-        b' ' => [0, 0, 0, 0, 0, 0, 0],
-        b'A' => [14, 17, 17, 31, 17, 17, 17],
-        b'B' => [30, 17, 17, 30, 17, 17, 30],
-        b'C' => [14, 17, 16, 16, 16, 17, 14],
-        b'D' => [30, 17, 17, 17, 17, 17, 30],
-        b'E' => [31, 16, 16, 30, 16, 16, 31],
-        b'F' => [31, 16, 16, 30, 16, 16, 16],
-        b'G' => [14, 17, 16, 23, 17, 17, 15],
-        b'H' => [17, 17, 17, 31, 17, 17, 17],
-        b'I' => [14, 4, 4, 4, 4, 4, 14],
-        b'J' => [1, 1, 1, 1, 17, 17, 14],
-        b'K' => [17, 18, 20, 24, 20, 18, 17],
-        b'L' => [16, 16, 16, 16, 16, 16, 31],
-        b'M' => [17, 27, 21, 21, 17, 17, 17],
-        b'N' => [17, 25, 21, 19, 17, 17, 17],
-        b'O' => [14, 17, 17, 17, 17, 17, 14],
-        b'P' => [30, 17, 17, 30, 16, 16, 16],
-        b'Q' => [14, 17, 17, 17, 21, 18, 13],
-        b'R' => [30, 17, 17, 30, 20, 18, 17],
-        b'S' => [15, 16, 16, 14, 1, 1, 30],
-        b'T' => [31, 4, 4, 4, 4, 4, 4],
-        b'U' => [17, 17, 17, 17, 17, 17, 14],
-        b'V' => [17, 17, 17, 17, 17, 10, 4],
-        b'W' => [17, 17, 17, 21, 21, 21, 10],
-        b'X' => [17, 17, 10, 4, 10, 17, 17],
-        b'Y' => [17, 17, 10, 4, 4, 4, 4],
-        b'Z' => [31, 1, 2, 4, 8, 16, 31],
-        b'0' => [14, 17, 19, 21, 25, 17, 14],
-        b'1' => [4, 12, 4, 4, 4, 4, 14],
-        b'2' => [14, 17, 1, 2, 4, 8, 31],
-        b'3' => [30, 1, 1, 14, 1, 1, 30],
-        b'4' => [2, 6, 10, 18, 31, 2, 2],
-        b'5' => [31, 16, 16, 30, 1, 1, 30],
-        b'6' => [14, 16, 16, 30, 17, 17, 14],
-        b'7' => [31, 1, 2, 4, 8, 8, 8],
-        b'8' => [14, 17, 17, 14, 17, 17, 14],
-        b'9' => [14, 17, 17, 15, 1, 1, 14],
-        b'>' => [16, 8, 4, 2, 4, 8, 16],
-        b'<' => [1, 2, 4, 8, 4, 2, 1],
-        b':' => [0, 4, 0, 0, 4, 0, 0],
-        b';' => [0, 4, 0, 0, 4, 4, 8],
-        b'.' => [0, 0, 0, 0, 0, 4, 4],
-        b',' => [0, 0, 0, 0, 4, 4, 8],
-        b'-' => [0, 0, 0, 31, 0, 0, 0],
-        b'_' => [0, 0, 0, 0, 0, 0, 31],
-        b'/' => [1, 2, 2, 4, 8, 8, 16],
-        b'\\' => [16, 8, 8, 4, 2, 2, 1],
-        b'[' => [14, 8, 8, 8, 8, 8, 14],
-        b']' => [14, 2, 2, 2, 2, 2, 14],
-        b'(' => [2, 4, 8, 8, 8, 4, 2],
-        b')' => [8, 4, 2, 2, 2, 4, 8],
-        b'=' => [0, 31, 0, 31, 0, 0, 0],
-        b'+' => [0, 4, 4, 31, 4, 4, 0],
-        b'*' => [0, 17, 10, 31, 10, 17, 0],
-        b'!' => [4, 4, 4, 4, 4, 0, 4],
-        b'?' => [14, 17, 1, 2, 4, 0, 4],
-        b'\'' => [4, 4, 2, 0, 0, 0, 0],
-        b'"' => [10, 10, 5, 0, 0, 0, 0],
-        b'#' => [10, 31, 10, 10, 31, 10, 0],
-        b'$' => [4, 15, 20, 14, 5, 30, 4],
-        b'%' => [24, 25, 2, 4, 8, 19, 3],
-        b'@' => [14, 17, 23, 21, 23, 16, 14],
-        b'&' => [12, 18, 20, 8, 21, 18, 13],
-        b'|' => [4, 4, 4, 4, 4, 4, 4],
-        b'^' => [4, 10, 17, 0, 0, 0, 0],
-        0x60 => [8, 4, 2, 0, 0, 0, 0],
-        _ => [31, 17, 1, 2, 4, 0, 4],
-    }
+fn glyph(character: char) -> RasterizedChar {
+    get_raster(character, FONT_WEIGHT, FONT_HEIGHT)
+        .or_else(|| get_raster('?', FONT_WEIGHT, FONT_HEIGHT))
+        .expect("Noto Sans Mono basic Latin must contain '?'")
 }

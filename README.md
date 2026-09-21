@@ -25,7 +25,7 @@ The x86_64 path provides a no_std Rust kernel with:
 - a mapped 2 MiB kernel heap that is writable, non-executable and surrounded by
   unmapped guard pages;
 - heap allocation/deallocation smoke validation;
-- framebuffer terminal and PS/2 keyboard input;
+- anti-aliased Noto Sans Mono 16 px framebuffer terminal and PS/2 keyboard input;
 - generated initramfs unpacked into the writable ramfs root;
 - generic VFS namespace with mount routing;
 - block-device abstraction, legacy virtio-blk PCI driver and PMM-backed DMA;
