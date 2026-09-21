@@ -5,9 +5,11 @@
 
 mod arch;
 mod recontrol;
+mod shell;
 
 use bootloader_api::{config::Mapping, info::MemoryRegionKind, BootInfo, BootloaderConfig};
 use kernel_core::{FrameAllocator, Region, PAGE_SIZE};
+use shell::SystemStats;
 
 static CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -35,6 +37,7 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
         .expect("physical mapping required");
     let mut usable = [Region::default(); 256];
     let mut count = 0;
+    let mut usable_bytes = 0u64;
     for region in info.memory_regions.iter() {
         if region.kind == MemoryRegionKind::Usable {
             assert!(count < usable.len(), "too many usable memory regions");
@@ -42,10 +45,11 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
                 start: region.start,
                 end: region.end,
             };
+            usable_bytes = usable_bytes.saturating_add(region.end.saturating_sub(region.start));
             count += 1;
         }
     }
-    usable[..count].sort_unstable_by_key(|r| r.start);
+    usable[..count].sort_unstable_by_key(|region| region.start);
     let mut frames = FrameAllocator::new(&usable[..count]).expect("invalid physical memory map");
     let first = frames.allocate().expect("no usable RAM");
     let second = frames.allocate().expect("insufficient usable RAM");
@@ -73,10 +77,34 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
     x86_64::instructions::interrupts::int3();
     log!("[ok] breakpoint returned\n");
     log!("GENERIC: READY\n");
-    // Keep this allocator's consumed-frame state when adding the next boot stages.
-    // Hardware interrupts remain masked until IRQ controllers and handlers exist.
+
+    let stats = SystemStats {
+        usable_regions: count,
+        usable_bytes,
+    };
+
+    if let Some(framebuffer) = info.framebuffer.as_mut() {
+        let mut console = arch::framebuffer::Console::new(framebuffer);
+        console.set_accent_color();
+        use core::fmt::Write;
+        let width = console.width();
+        let height = console.height();
+        let _ = writeln!(console, "GENERIC framebuffer {width}x{height} READY");
+        console.set_default_color();
+        log!("[ok] framebuffer console {}x{}\n", width, height);
+
+        #[cfg(feature = "smoke")]
+        arch::exit(true);
+
+        #[cfg(not(feature = "smoke"))]
+        shell::run(console, stats);
+    }
+
+    log!("[warn] no framebuffer supplied by bootloader\n");
+
     #[cfg(feature = "smoke")]
     arch::exit(true);
+
     #[cfg(not(feature = "smoke"))]
     arch::halt()
 }
