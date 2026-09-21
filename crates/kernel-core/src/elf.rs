@@ -163,6 +163,7 @@ fn read_u64(data: &[u8], offset: usize) -> Result<u64, ElfError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
 
     fn fixture() -> Vec<u8> {
         let mut elf = vec![0u8; 0x104];
