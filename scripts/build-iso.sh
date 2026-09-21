@@ -18,14 +18,23 @@ case "$mode" in
     ;;
 esac
 
+for tool in nasm xorriso; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "$tool not found; install nasm and xorriso" >&2
+    exit 1
+  fi
+done
+
 cargo build --locked -p generic-kernel --target x86_64-unknown-none --release "${features[@]}"
 kernel="target/x86_64-unknown-none/release/generic-kernel"
 uefi="build/${stem}-uefi.img"
 bios="build/${stem}-bios.img"
+chain="build/eltorito-bios-mbr.bin"
 iso="build/${stem}.iso"
 
 cargo run --locked -p generic-image --release -- uefi "$kernel" "$uefi"
 cargo run --locked -p generic-image --release -- bios "$kernel" "$bios"
-python3 tools/uefi_iso.py "$uefi" "$bios" "$iso"
+nasm -f bin arch/x86/eltorito_chain.asm -o "$chain"
+python3 tools/uefi_iso.py "$uefi" "$bios" "$chain" "$iso"
 
 echo "Generic hybrid BIOS + UEFI ISO: $iso"

@@ -22,7 +22,7 @@ linked into the kernel ELF and called during boot.
 
 On Ubuntu / WSL2 install:
 
-    sudo apt-get install build-essential clang pkg-config qemu-system-x86 ovmf python3 xorriso
+    sudo apt-get install build-essential clang pkg-config qemu-system-x86 ovmf python3 xorriso nasm
 
 Then build:
 
@@ -34,10 +34,12 @@ The result is:
 
 This ISO has two El Torito boot entries:
 
-- legacy BIOS, using the Generic BIOS bootloader image;
+- legacy BIOS, through a small Generic CD chainloader that enters the existing
+  BIOS boot path;
 - UEFI, using the Generic EFI System Partition.
 
-That means the same ISO can boot in VirtualBox whether EFI is enabled or not.
+That means the same ISO is intended to boot in VirtualBox whether EFI is
+enabled or disabled.
 
 You can test both firmware paths in QEMU:
 
@@ -58,6 +60,9 @@ Attach:
 to the VM's optical drive and start it. EFI may be enabled or disabled. The
 Generic framebuffer terminal should appear in the VM window. Click inside the
 window and type HELP.
+
+Do not use the older build/generic-uefi.iso from an earlier revision; that
+image was UEFI-only.
 
 ## UEFI disk image
 
@@ -96,6 +101,7 @@ checks that the generated LLVM IR is reproducible.
 
 - kernel/ — freestanding x86_64 kernel.
 - crates/kernel-core/ — platform-independent safe algorithms.
+- arch/x86/ — x86 bootstrap helpers used by optical boot.
 - arch/x128/ — x128 bootstrap source.
 - tools/x128.py — x128 assembler/reference emulator.
 - tools/uefi_iso.py — builds the hybrid BIOS + UEFI ISO.

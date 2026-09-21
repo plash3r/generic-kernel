@@ -12,8 +12,7 @@ jobs:
       - name: Format and core tests
         run: |
           cargo fmt --all -- --check
-          cargo test -p kernel-core
-          git diff -- Cargo.lock
+          cargo test --locked -p kernel-core
           python3 -m py_compile tools/x128.py tools/uefi_iso.py scripts/run.py
       - name: x128 reference boot
         run: |
@@ -31,7 +30,7 @@ jobs:
           RCL="$PWD/.deps/recontrol-lang/target/debug/rcl" bash scripts/recontrol.sh
           git diff --exit-code -- userspace/recontrol/kernel_probe.ll
       - name: Emulator, ISO and LLVM tools
-        run: sudo apt-get update && sudo apt-get install -y clang qemu-system-x86 ovmf xorriso
+        run: sudo apt-get update && sudo apt-get install -y clang qemu-system-x86 ovmf xorriso nasm
       - name: UEFI disk boot smoke test
         run: |
           bash scripts/build.sh smoke
@@ -47,7 +46,6 @@ jobs:
         with:
           name: boot-evidence
           path: |
-            Cargo.lock
             build/smoke.log
             build/smoke-iso-uefi.log
             build/smoke-iso-bios.log

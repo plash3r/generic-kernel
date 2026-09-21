@@ -12,6 +12,9 @@ import uuid
 SECTOR_SIZE = 512
 GPT_SIGNATURE = b"EFI PART"
 EFI_SYSTEM_PARTITION = uuid.UUID("c12a7328-f81f-11d2-ba4b-00a0c93ec93b")
+MBR_PARTITION_TABLE = 446
+MBR_SIGNATURE = b"\x55\xaa"
+INNER_DISK_LBA = 63
 
 
 class IsoError(Exception):
@@ -39,7 +42,6 @@ def find_efi_partition(image: Path) -> tuple[int, int]:
                 raise IsoError("truncated GPT partition table")
             if entry[:16] == bytes(16):
                 continue
-
             if uuid.UUID(bytes_le=entry[:16]) != EFI_SYSTEM_PARTITION:
                 continue
 
@@ -68,7 +70,63 @@ def copy_range(source: Path, target: Path, offset: int, length: int) -> None:
             remaining -= len(chunk)
 
 
-def build_iso(uefi_disk: Path, bios_disk: Path, output: Path) -> None:
+def patch_inner_mbr(image: bytearray, lba_offset: int) -> None:
+    if len(image) < SECTOR_SIZE or image[510:512] != MBR_SIGNATURE:
+        raise IsoError("BIOS disk image does not contain a valid MBR")
+
+    for index in range(4):
+        entry = MBR_PARTITION_TABLE + index * 16
+        sectors = struct.unpack_from("<I", image, entry + 12)[0]
+        if sectors == 0:
+            continue
+        start_lba = struct.unpack_from("<I", image, entry + 8)[0]
+        adjusted = start_lba + lba_offset
+        if adjusted > 0xFFFFFFFF:
+            raise IsoError("BIOS partition LBA overflow")
+        struct.pack_into("<I", image, entry + 8, adjusted)
+
+
+def create_bios_eltorito_image(
+    bios_disk: Path, chainloader: Path, output: Path
+) -> None:
+    wrapper = bytearray(chainloader.read_bytes())
+    if len(wrapper) != SECTOR_SIZE or wrapper[510:512] != MBR_SIGNATURE:
+        raise IsoError("BIOS El Torito chainloader must be a 512-byte MBR")
+
+    inner = bytearray(bios_disk.read_bytes())
+    patch_inner_mbr(inner, INNER_DISK_LBA)
+
+    inner_sectors = (len(inner) + SECTOR_SIZE - 1) // SECTOR_SIZE
+    inner.extend(bytes(inner_sectors * SECTOR_SIZE - len(inner)))
+
+    wrapper[MBR_PARTITION_TABLE : MBR_PARTITION_TABLE + 64] = bytes(64)
+    # El Torito hard-disk emulation permits exactly one partition and requires
+    # it in the first MBR slot. 0/1/1 is the conventional CHS representation
+    # for LBA 63 with 63 sectors per track.
+    entry = struct.pack(
+        "<B3sB3sII",
+        0x80,
+        bytes((0x01, 0x01, 0x00)),
+        0x7F,
+        bytes((0xFE, 0xFF, 0xFF)),
+        INNER_DISK_LBA,
+        inner_sectors,
+    )
+    wrapper[MBR_PARTITION_TABLE : MBR_PARTITION_TABLE + 16] = entry
+    wrapper[510:512] = MBR_SIGNATURE
+
+    with output.open("wb") as handle:
+        handle.write(wrapper)
+        handle.write(bytes((INNER_DISK_LBA - 1) * SECTOR_SIZE))
+        handle.write(inner)
+
+
+def build_iso(
+    uefi_disk: Path,
+    bios_disk: Path,
+    chainloader: Path,
+    output: Path,
+) -> None:
     xorriso = shutil.which("xorriso")
     if not xorriso:
         raise IsoError("xorriso not found; install the xorriso package")
@@ -82,9 +140,9 @@ def build_iso(uefi_disk: Path, bios_disk: Path, output: Path) -> None:
         boot.mkdir(parents=True)
 
         efi_image = boot / "efi.img"
-        bios_image = boot / "bios.img"
+        bios_image = boot / "bios-hdd.img"
         copy_range(uefi_disk, efi_image, offset, length)
-        shutil.copyfile(bios_disk, bios_image)
+        create_bios_eltorito_image(bios_disk, chainloader, bios_image)
 
         subprocess.run(
             [
@@ -100,7 +158,7 @@ def build_iso(uefi_disk: Path, bios_disk: Path, output: Path) -> None:
                 "-c",
                 "boot/boot.cat",
                 "-b",
-                "boot/bios.img",
+                "boot/bios-hdd.img",
                 "-hard-disk-boot",
                 "-eltorito-alt-boot",
                 "-e",
@@ -121,14 +179,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("uefi_disk", type=Path)
     parser.add_argument("bios_disk", type=Path)
+    parser.add_argument("chainloader", type=Path)
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
 
     try:
-        for image in (args.uefi_disk, args.bios_disk):
+        for image in (args.uefi_disk, args.bios_disk, args.chainloader):
             if not image.is_file():
-                raise IsoError(f"disk image not found: {image}")
-        build_iso(args.uefi_disk, args.bios_disk, args.output)
+                raise IsoError(f"input file not found: {image}")
+        build_iso(args.uefi_disk, args.bios_disk, args.chainloader, args.output)
     except (IsoError, OSError, subprocess.CalledProcessError) as exc:
         print(f"generic-iso: {exc}", file=sys.stderr)
         return 1
