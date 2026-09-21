@@ -181,6 +181,8 @@ if b"[ok] scheduler context switch:" not in output:
     sys.exit(f"scheduler smoke FAILED; see build/{log_name}")
 if b"[ok] process address space:" not in output or b"private page-table tree" not in output:
     sys.exit(f"process CR3 isolation smoke FAILED; see build/{log_name}")
+if b"[ok] userspace scheduler task:" not in output or b"ready->running->exited" not in output:
+    sys.exit(f"userspace scheduler integration smoke FAILED; see build/{log_name}")
 if b"GENERIC USER: /bin/init via validated write syscall" not in output:
     sys.exit(f"userspace pointer/write syscall smoke FAILED; see build/{log_name}")
 if b"[ok] userspace ELF /bin/init:" not in output or b"CPL3" not in output:

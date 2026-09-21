@@ -391,12 +391,17 @@ fn kernel_diagnostics(console: &mut Console<'_>) {
         && user.last_cpl == 3
         && process.process_count > 0
         && process.isolated_address_space
+        && process.scheduler_task_id != 0
     {
         summary.ok(
             console,
             format_args!(
-                "userspace ELF/syscall: {} process(es), CPL{}, isolated CR3={:#x}, init exit={}",
-                process.process_count, user.last_cpl, process.process_cr3, process.last_exit
+                "userspace ELF/syscall: {} process(es), CPL{}, isolated CR3={:#x}, task={}, init exit={}",
+                process.process_count,
+                user.last_cpl,
+                process.process_cr3,
+                process.scheduler_task_id,
+                process.last_exit
             ),
         );
     } else {
@@ -727,6 +732,7 @@ fn processes(console: &mut Console<'_>) {
     let _ = writeln!(console, "Userspace processes: {}", items.len());
     for process in items {
         let state = match process.state {
+            crate::process::ProcessState::Ready => "ready",
             crate::process::ProcessState::Running => "running",
             crate::process::ProcessState::Exited => "exited",
         };

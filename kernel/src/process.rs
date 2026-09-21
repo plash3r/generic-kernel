@@ -8,6 +8,7 @@ const USER_LIMIT: u64 = 1u64 << 39;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProcessState {
+    Ready,
     Running,
     Exited,
 }
@@ -26,6 +27,7 @@ struct Process {
     state: ProcessState,
     entry: u64,
     cr3: u64,
+    stack_top: u64,
     fds: [Option<FdKind>; 3],
     exit_code: Option<u64>,
 }
@@ -49,6 +51,7 @@ pub struct Diagnostics {
     pub kernel_cr3: u64,
     pub process_cr3: u64,
     pub isolated_address_space: bool,
+    pub scheduler_task_id: u64,
 }
 
 static PROCESSES: Mutex<Vec<Process>> = Mutex::new(Vec::new());
@@ -56,6 +59,8 @@ static NEXT_PID: AtomicU64 = AtomicU64::new(1);
 static PROBE_OK: AtomicBool = AtomicBool::new(false);
 static LAST_EXIT: AtomicU64 = AtomicU64::new(0);
 static CURRENT_PID: AtomicU64 = AtomicU64::new(0);
+static INIT_PID: AtomicU64 = AtomicU64::new(0);
+static INIT_TASK_ID: AtomicU64 = AtomicU64::new(0);
 
 pub fn init_probe() {
     if PROBE_OK.load(Ordering::SeqCst) {
@@ -84,9 +89,10 @@ pub fn init_probe() {
         processes.push(Process {
             pid,
             name: String::from("/bin/init"),
-            state: ProcessState::Running,
+            state: ProcessState::Ready,
             entry: image.entry(),
             cr3: process_space.root,
+            stack_top,
             fds: [
                 Some(FdKind::Stdin),
                 Some(FdKind::Stdout),
@@ -96,32 +102,36 @@ pub fn init_probe() {
         });
     }
 
-    crate::mm::activate_address_space(process_space).expect("failed to activate /bin/init CR3");
-    assert_eq!(crate::mm::active_address_space(), process_space);
-    CURRENT_PID.store(pid, Ordering::SeqCst);
+    INIT_PID.store(pid, Ordering::SeqCst);
+    let task_id =
+        crate::task::spawn("process/init", run_init_process).expect("failed to schedule /bin/init");
+    INIT_TASK_ID.store(task_id, Ordering::SeqCst);
 
-    let exit = crate::arch::user::enter(image.entry(), stack_top);
+    for _ in 0..128 {
+        let exited = PROCESSES
+            .lock()
+            .iter()
+            .find(|process| process.pid == pid)
+            .map(|process| process.state == ProcessState::Exited)
+            .unwrap_or(false);
+        if exited {
+            break;
+        }
+        crate::task::yield_now();
+    }
 
-    CURRENT_PID.store(0, Ordering::SeqCst);
-    crate::mm::activate_address_space(kernel_space).expect("failed to restore kernel CR3");
-    assert_eq!(crate::mm::active_address_space(), kernel_space);
+    let exit = PROCESSES
+        .lock()
+        .iter()
+        .find(|process| process.pid == pid)
+        .and_then(|process| process.exit_code)
+        .expect("scheduled /bin/init did not exit");
 
     assert!(
         exit > 0 && exit != crate::arch::user::ENOSYS,
         "userspace init syscall path failed"
     );
 
-    {
-        let mut processes = PROCESSES.lock();
-        let process = processes
-            .iter_mut()
-            .find(|process| process.pid == pid)
-            .expect("userspace process disappeared");
-        process.state = ProcessState::Exited;
-        process.exit_code = Some(exit);
-    }
-
-    LAST_EXIT.store(exit, Ordering::SeqCst);
     PROBE_OK.store(true, Ordering::SeqCst);
 
     let user = crate::arch::user::diagnostics();
@@ -131,11 +141,63 @@ pub fn init_probe() {
         process_space.root
     );
     crate::log!(
+        "[ok] userspace scheduler task: pid={} task={} ready->running->exited\n",
+        pid,
+        task_id
+    );
+    crate::log!(
         "[ok] userspace ELF /bin/init: entry={:#x}, CPL{}, exit={}\n",
         image.entry(),
         user.last_cpl,
         exit
     );
+}
+
+fn run_init_process() {
+    let pid = INIT_PID.load(Ordering::SeqCst);
+    assert_ne!(pid, 0, "scheduled userspace task missing PID");
+
+    let (entry, stack_top, process_space) = {
+        let mut processes = PROCESSES.lock();
+        let process = processes
+            .iter_mut()
+            .find(|process| process.pid == pid)
+            .expect("scheduled userspace process disappeared");
+        assert_eq!(
+            process.state,
+            ProcessState::Ready,
+            "scheduled userspace process was not ready"
+        );
+        process.state = ProcessState::Running;
+        (
+            process.entry,
+            process.stack_top,
+            crate::mm::AddressSpace { root: process.cr3 },
+        )
+    };
+
+    let kernel_space = crate::mm::active_address_space();
+    crate::mm::activate_address_space(process_space).expect("failed to activate process CR3");
+    assert_eq!(crate::mm::active_address_space(), process_space);
+    CURRENT_PID.store(pid, Ordering::SeqCst);
+
+    let exit = crate::arch::user::enter(entry, stack_top);
+
+    CURRENT_PID.store(0, Ordering::SeqCst);
+    crate::mm::activate_address_space(kernel_space).expect("failed to restore kernel CR3");
+    assert_eq!(crate::mm::active_address_space(), kernel_space);
+
+    {
+        let mut processes = PROCESSES.lock();
+        let process = processes
+            .iter_mut()
+            .find(|process| process.pid == pid)
+            .expect("userspace process disappeared after exit");
+        process.state = ProcessState::Exited;
+        process.exit_code = Some(exit);
+    }
+
+    LAST_EXIT.store(exit, Ordering::SeqCst);
 }
 
 pub fn diagnostics() -> Diagnostics {
@@ -149,6 +211,7 @@ pub fn diagnostics() -> Diagnostics {
         kernel_cr3,
         process_cr3,
         isolated_address_space: process_cr3 != 0 && process_cr3 != kernel_cr3,
+        scheduler_task_id: INIT_TASK_ID.load(Ordering::SeqCst),
     }
 }
 

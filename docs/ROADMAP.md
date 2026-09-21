@@ -23,9 +23,11 @@
    now gets a private CR3 and a deep-cloned private page-table tree; user
    mappings never modify the kernel page-table tree. This conservative model
    works with the bootloader's existing low-half mappings. A process table
-   tracks CR3, entry point and lifecycle. Remaining: asynchronous process
-   scheduling, address-space teardown/refcounting, a more memory-efficient
-   shared supervisor kernel half and a long-lived init/userspace runtime.
+   tracks CR3, entry point and lifecycle, and /bin/init now runs as a
+   scheduler-owned task with ready/running/exited transitions. Remaining:
+   preemptive multi-process scheduling, address-space teardown/refcounting, a
+   more memory-efficient shared supervisor kernel half and a long-lived
+   init/userspace runtime.
    The first bounded user-pointer validation and stdout/stderr write syscall
    are working; this must expand into general copyin/copyout and FD/VFS APIs.
 6. Recontrol userspace runtime: no_std Generic runtime, stable syscall ABI,
