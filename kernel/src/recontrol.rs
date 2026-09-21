@@ -9,6 +9,9 @@ pub fn verify() {
     // SAFETY: `kernel/build.rs` links a freestanding object that exports exactly
     // `extern C i32 rcl_generic_probe(void)` from checked-in Recontrol LLVM IR.
     let value = unsafe { rcl_generic_probe() };
-    assert_eq!(value, 128, "Recontrol kernel ABI probe returned the wrong value");
+    assert_eq!(
+        value, 128,
+        "Recontrol kernel ABI probe returned the wrong value"
+    );
     crate::log!("[ok] Recontrol freestanding ABI ({value})\n");
 }

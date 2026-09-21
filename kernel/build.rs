@@ -11,8 +11,8 @@ fn main() {
 
     let manifest = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("manifest dir"));
     let input = manifest.join("../userspace/recontrol/kernel_probe.ll");
-    let output = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR"))
-        .join("recontrol-kernel-probe.o");
+    let output =
+        PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR")).join("recontrol-kernel-probe.o");
     let clang = env::var_os("CLANG").unwrap_or_else(|| "clang".into());
 
     let status = Command::new(&clang)
@@ -31,6 +31,12 @@ fn main() {
         .status()
         .unwrap_or_else(|error| panic!("failed to execute {:?}: {error}", clang));
 
-    assert!(status.success(), "clang failed to compile Recontrol kernel probe");
-    println!("cargo:rustc-link-arg-bin=generic-kernel={}", output.display());
+    assert!(
+        status.success(),
+        "clang failed to compile Recontrol kernel probe"
+    );
+    println!(
+        "cargo:rustc-link-arg-bin=generic-kernel={}",
+        output.display()
+    );
 }
