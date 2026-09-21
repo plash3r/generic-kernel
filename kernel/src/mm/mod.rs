@@ -125,9 +125,7 @@ pub fn init(info: &BootInfo) {
 pub fn runtime_diagnostics() -> Option<crate::arch::memory::RuntimeMemoryDiagnostics> {
     let offset = (*PHYSICAL_MEMORY_OFFSET.lock())?;
     Some(crate::arch::memory::runtime_diagnostics(
-        offset,
-        HEAP_START,
-        HEAP_SIZE,
+        offset, HEAP_START, HEAP_SIZE,
     ))
 }
 

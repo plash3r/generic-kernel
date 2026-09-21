@@ -255,7 +255,6 @@ fn kernel_status(console: &mut Console<'_>) {
     }
 }
 
-
 #[derive(Default)]
 struct DiagnosticSummary {
     passed: usize,
@@ -318,7 +317,10 @@ fn kernel_diagnostics(console: &mut Console<'_>) {
             if memory.cr3 != 0 && memory.write_protect {
                 summary.ok(
                     console,
-                    format_args!("MMU: CR3={:#x}, supervisor write-protect enabled", memory.cr3),
+                    format_args!(
+                        "MMU: CR3={:#x}, supervisor write-protect enabled",
+                        memory.cr3
+                    ),
                 );
             } else {
                 summary.fail(
@@ -377,7 +379,10 @@ fn kernel_diagnostics(console: &mut Console<'_>) {
             ),
         );
     } else {
-        summary.fail(console, format_args!("framebuffer or terminal geometry is invalid"));
+        summary.fail(
+            console,
+            format_args!("framebuffer or terminal geometry is invalid"),
+        );
     }
 
     match crate::vfs::metadata("/") {
@@ -392,7 +397,10 @@ fn kernel_diagnostics(console: &mut Console<'_>) {
         Ok(data) if !data.is_empty() => {
             summary.ok(
                 console,
-                format_args!("initramfs content readable: /etc/issue ({} bytes)", data.len()),
+                format_args!(
+                    "initramfs content readable: /etc/issue ({} bytes)",
+                    data.len()
+                ),
             );
         }
         Ok(_) => summary.warn(console, format_args!("/etc/issue is empty")),
@@ -412,7 +420,10 @@ fn kernel_diagnostics(console: &mut Console<'_>) {
             format_args!("root filesystem: ramfs ({} mount(s) total)", mounts.len()),
         );
     } else {
-        summary.fail(console, format_args!("expected ramfs root mount is missing"));
+        summary.fail(
+            console,
+            format_args!("expected ramfs root mount is missing"),
+        );
     }
 
     if mounts
@@ -465,7 +476,10 @@ fn kernel_diagnostics(console: &mut Console<'_>) {
         if summary.warnings == 0 {
             let _ = writeln!(console, "Result: all checked subsystems healthy");
         } else {
-            let _ = writeln!(console, "Result: checked subsystems operational with warnings");
+            let _ = writeln!(
+                console,
+                "Result: checked subsystems operational with warnings"
+            );
         }
     } else {
         let _ = writeln!(console, "Result: one or more checked subsystems failed");
