@@ -212,6 +212,7 @@ mod tests {
         let mut elf = fixture();
         let ph = 64;
         elf[ph + 32..ph + 40].copy_from_slice(&128u64.to_le_bytes());
+        elf[ph + 40..ph + 48].copy_from_slice(&128u64.to_le_bytes());
         assert_eq!(
             ElfImage::parse(&elf).unwrap_err(),
             ElfError::TruncatedSegment
