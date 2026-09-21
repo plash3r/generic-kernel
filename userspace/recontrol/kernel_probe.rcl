@@ -1,0 +1,3 @@
+fn generic_probe():i32 {
+    return 128
+}

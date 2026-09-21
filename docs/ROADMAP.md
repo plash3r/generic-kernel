@@ -1,22 +1,22 @@
-# Этапы и критерии приёмки
+# Generic OS roadmap
 
-1. **Bootstrap (этот пакет):** UEFI → ELF → serial, GDT/TSS/IDT,
-   выделение и проверка RAM, возврат из int3. Приёмка: тесты core + QEMU smoke.
-2. **Защищённая память:** PMM с учётом уже выделенных страниц, собственный mapper,
-   NX/W^X, guard pages, heap, полный fault coverage. Проверить исчерпание памяти,
-   конфликт mapping, unmapped access и переполнение стека в отдельных QEMU-тестах.
-3. **Прерывания и время:** ACPI/MADT, APIC/IOAPIC, таймер, монотонные часы;
-   включить IRQ только после настройки контроллеров. Проверить повторные IRQ и EOI.
-4. **Задачи:** сначала kernel threads, затем вытеснение и SMP;
-   per-CPU состояние, синхронизация, блокировки и сохранение FPU/SIMD.
-   Приёмка: стресс переключений и отсутствие взаимных блокировок.
-5. **Изоляция:** ring 3, отдельные address spaces, syscalls, проверка user pointers,
-   ELF64 loader и init. Ошибка user-процесса не должна останавливать ядро.
-6. **Хранение:** VFS, initramfs, ramfs, затем virtio-blk и дисковая ФС.
-   Приёмка: права доступа, некорректные образы, ошибки и короткие I/O.
-7. **Пользовательская среда:** минимальная libc, shell, утилиты, IPC.
-8. **Расширение поддержки:** SMP квалификация, PCI/virtio-net, оборудование,
-   документация ABI, fuzzing парсеров и модель безопасности.
+1. Bootstrap — working now: UEFI to x86_64 ELF, serial diagnostics, GDT/TSS/IDT,
+   RAM allocation test, returning breakpoint, freestanding Recontrol ABI call,
+   x86_64 QEMU smoke and x128 reference smoke.
+2. Protected memory: permanent PMM, owned page tables, NX/W^X, guard pages,
+   kernel heap and complete fault coverage.
+3. Interrupts and time: ACPI/MADT, APIC/IOAPIC, timer and monotonic clock.
+4. Tasks: kernel threads, preemption, SMP, per-CPU state and synchronization.
+5. Isolation: ring 3, separate address spaces, syscalls, user-pointer checking,
+   ELF loader and init process.
+6. Recontrol userspace runtime: no_std Generic runtime, stable syscall ABI,
+   process exit, byte/string output, allocation and panic path.
+7. Storage: VFS, initramfs/ramfs, virtio-blk and a persistent filesystem.
+8. User environment: shell, utilities, IPC and system services.
+9. Networking and hardware qualification: PCI, virtio-net, real devices,
+   fuzzing and security review.
+10. Native x128 port: define trap/privilege/MMU/atomic contracts, add a compiler
+    backend and replace the reference bootstrap with a full Generic kernel build.
 
-Каждый этап завершать наблюдаемым результатом и воспроизводимыми проверками.
-Сроки до выбора объёма драйверов и совместимости не назначены.
+Every stage should end with an observable, reproducible acceptance test.
+The x128 target remains experimental until its ABI and toolchain are stable.

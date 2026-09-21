@@ -13,8 +13,24 @@ jobs:
         run: |
           cargo fmt --all -- --check
           cargo test --locked -p kernel-core
-      - name: Emulator
-        run: sudo apt-get update && sudo apt-get install -y qemu-system-x86 ovmf
+          python3 -m py_compile tools/x128.py scripts/run.py
+      - name: x128 reference boot
+        run: |
+          bash scripts/x128.sh smoke
+          bash scripts/x128.sh build
+      - name: Recontrol compiler
+        uses: actions/checkout@v4
+        with:
+          repository: plash3r/recontrol-lang
+          ref: 60afe21fbae870cf9b6ec36d4bdfd798a738d84f
+          path: .deps/recontrol-lang
+      - name: Recontrol kernel ABI
+        run: |
+          cargo build --locked --manifest-path .deps/recontrol-lang/Cargo.toml -p rcl
+          RCL="$PWD/.deps/recontrol-lang/target/debug/rcl" bash scripts/recontrol.sh
+          git diff --exit-code -- userspace/recontrol/kernel_probe.ll
+      - name: Emulator and LLVM tools
+        run: sudo apt-get update && sudo apt-get install -y clang qemu-system-x86 ovmf
       - name: Boot smoke test
         run: |
           bash scripts/build.sh smoke
@@ -26,3 +42,4 @@ jobs:
           path: |
             build/smoke.log
             build/generic-smoke-uefi.img
+            build/generic-x128.img

@@ -1,0 +1,28 @@
+# Generic x128 reference bootstrap.
+# Validates full-width ALU wraparound, branches, memory and console output.
+
+puts "GENERIC x128: boot\n"
+
+movi r2, 0xffffffffffffffffffffffffffffffff
+movi r3, 1
+add r2, r2, r3
+movi r4, 0
+cmpeq r2, r4
+jz alu_ok
+puts "GENERIC x128: PANIC alu\n"
+halt 1
+
+alu_ok:
+movi r5, 0x4000
+movi r6, 0xa5
+store8 r5, r6, 0
+load8 r7, r5, 0
+cmpeq r7, r6
+jz memory_ok
+puts "GENERIC x128: PANIC memory\n"
+halt 2
+
+memory_ok:
+puts "[ok] x128 ALU / branch / memory\n"
+puts "GENERIC x128: READY\n"
+halt 0

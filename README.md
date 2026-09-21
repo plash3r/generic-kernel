@@ -1,75 +1,93 @@
-# Generic — основа ядра на Rust
+# Generic OS — kernel
 
-Репозиторий: [plash3r/generic-kernel](https://github.com/plash3r/generic-kernel).
-Название ядра: Generic. Первый этап разработки собственного модульного
-монолитного ядра x86_64. Это ранняя основа, не готовая ОС и не production-ready ядро.
-Лицензия пока не выбрана владельцем и намеренно не назначена.
+This repository contains the kernel of Generic OS.
 
-## Реализовано
+The primary hardware target is x86_64 + UEFI. The repository also contains an
+experimental x128 reference architecture that can already execute Generic's
+bootstrap in a deterministic emulator.
 
-- Отдельный `no_std` ELF ядра и инструмент создания UEFI disk image.
-- Загрузка через сторонний Rust OSDev bootloader 0.11.10.
-- Диагностика COM1; вывод panic с ограниченным ожиданием UART.
-- GDT, TSS, IDT; обработчики breakpoint, invalid opcode, GP, page fault,
-  double fault с отдельным IST-стеком 32 KiB.
-- Bootstrap-аллокатор физических страниц 4 KiB без динамической памяти:
-  выравнивание, проверка карты, пропуск нулевой страницы, защита от переполнения.
-- Проверка записи/чтения двух выделенных страниц через отображение памяти загрузчика.
-- Проверка возврата из breakpoint; QEMU smoke runner с timeout и кодом завершения.
-- Отдельная платформонезависимая библиотека с тестами; CI для сборки и загрузки.
+## Working now
 
-## Пока отсутствует
+The x86_64 path provides a no_std Rust kernel, UEFI loading, COM1 diagnostics,
+GDT/TSS/IDT, selected CPU exception handlers, a bootstrap physical-frame
+allocator, RAM write/read validation and a QEMU smoke test.
 
-Собственные таблицы страниц и heap, полный набор обработчиков исключений,
-аппаратные IRQ и таймер, APIC/ACPI, SMP, процессы, ring 3, syscalls, ELF user loader,
-VFS, накопители, сеть, клавиатура, экранная консоль и графический интерфейс.
-После диагностики ядро останавливается через CLI/HLT. Обработчики IRQ ещё не готовы,
-поэтому аппаратные прерывания намеренно не включаются.
+Recontrol is integrated at the kernel ABI boundary. A function compiled from
+userspace/recontrol/kernel_probe.rcl is turned into freestanding LLVM code,
+linked into the kernel ELF and called during boot. A successful boot includes:
 
-## Сборка и запуск — Linux / WSL2
+    GENERIC: boot
+    [ok] GDT / TSS / IDT
+    [ok] Recontrol freestanding ABI (128)
+    ...
+    GENERIC: READY
 
-Установить Rust через rustup, C toolchain, Python 3, QEMU и OVMF.
-Для Ubuntu: `sudo apt-get install build-essential pkg-config qemu-system-x86 ovmf`.
-Rustup прочитает `rust-toolchain.toml` и установит закреплённый nightly и target.
-Первой сборке нужен интернет для зависимостей.
+x128 is a Generic-defined experimental ISA, not an existing hardware
+architecture. Its current reference machine has 16 128-bit registers, a
+128-bit PC/address model, fixed-size instructions, byte-addressable memory,
+branches, output and deterministic halt status. The x128 smoke boot checks
+full-width arithmetic, branches and memory and requires:
 
-```bash
-cargo test --locked -p kernel-core
-bash scripts/build.sh
-python3 scripts/run.py
-```
+    GENERIC x128: READY
 
-Вывод идёт в терминал через serial. Ожидаемая завершающая строка: `GENERIC: READY`.
-Остановка обычного запуска — Ctrl+C. Образ лежит в `build/generic-uefi.img`.
-Если прошивка не найдена, задать `OVMF_CODE=/absolute/path/OVMF_CODE_4M.fd`.
-Запуск использует один CPU и TCG, не требует KVM, не подключает сеть и физические диски.
+See docs/X128.md and docs/RECONTROL.md.
 
-```bash
-bash scripts/build.sh smoke
-python3 scripts/run.py --smoke
-```
+## Build x86_64
 
-Smoke-версия выходит из QEMU через порт 0xf4. Успех требует одновременно exit code 33
-и маркер READY; panic, аварийное завершение или timeout считаются ошибкой.
-Журнал: `build/smoke.log`. Обычный и smoke-образы сохраняются под разными именами.
+On Ubuntu / WSL2 install:
 
-## Структура
+    sudo apt-get install build-essential clang pkg-config qemu-system-x86 ovmf python3
 
-- `kernel/src/arch/` — привилегированный код x86_64, UART, таблицы дескрипторов.
-- `kernel/src/main.rs` — последовательность загрузки и диагностики.
-- `crates/kernel-core/` — безопасные алгоритмы без зависимости от платформы.
-- `tools/image/` — создание загрузочного образа на хосте.
-- `scripts/` — сборка и QEMU; `docs/` — решения, план и ограничения.
+Then run:
 
-Для GDB собрать обычный образ и выполнить `python3 scripts/run.py --debug`.
-Подключение: `target remote localhost:1234`, ELF: `target/x86_64-unknown-none/release/generic-kernel`.
-Для полноценной отладки символов добавить `debug = 2` в `[profile.release]` и пересобрать.
+    cargo test --locked -p kernel-core
+    bash scripts/build.sh smoke
+    python3 scripts/run.py --smoke
 
-Фактический результат проверок в этом окружении — `docs/VALIDATION.md`.
+For a normal run:
 
-## Образы и CI
+    bash scripts/build.sh
+    python3 scripts/run.py
 
-В Git хранятся исходники; `build/` и `target/` исключены. После клонирования
-сначала выполните сборку. Образы из первоначального ZIP — отдельная поставка.
-GitHub Actions собирает smoke-образ и запускает его в QEMU; результат смотрите
-во вкладке Actions. Наличие workflow само по себе не означает успешный тест.
+## Build and run x128
+
+    bash scripts/x128.sh build
+    bash scripts/x128.sh smoke
+
+The encoded image is build/generic-x128.img.
+
+## Recontrol regeneration
+
+Use an installed compiler:
+
+    bash scripts/recontrol.sh
+
+Or point at a checkout:
+
+    RECONTROL_ROOT=../recontrol-lang bash scripts/recontrol.sh
+
+Or at a specific compiler executable:
+
+    RCL=/path/to/rcl bash scripts/recontrol.sh
+
+CI pins the Recontrol revision recorded in userspace/recontrol/REVISION and
+checks that the generated LLVM IR is reproducible.
+
+## Project layout
+
+- kernel/ — freestanding x86_64 kernel.
+- crates/kernel-core/ — platform-independent safe algorithms.
+- arch/x128/ — x128 bootstrap source.
+- tools/x128.py — x128 assembler/reference emulator.
+- userspace/recontrol/ — Recontrol source, generated IR and compiler revision.
+- tools/image/ — UEFI disk image builder.
+- scripts/ — build, QEMU, x128 and Recontrol commands.
+- docs/ — architecture decisions, roadmap and validation notes.
+
+## Current boundary
+
+Generic now has executable boot paths and automated acceptance checks, but it is
+not yet a complete general-purpose desktop/server OS. It still needs its own VM
+manager and heap, hardware IRQ/timer support, scheduler/SMP, ring 3, syscalls,
+user ELF loading, VFS/storage, input, graphics and networking. These remain
+tracked in docs/ROADMAP.md.

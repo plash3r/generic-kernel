@@ -4,6 +4,8 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 mod arch;
+mod recontrol;
+
 use bootloader_api::{config::Mapping, info::MemoryRegionKind, BootInfo, BootloaderConfig};
 use kernel_core::{FrameAllocator, Region, PAGE_SIZE};
 
@@ -21,6 +23,12 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
     log!("GENERIC: boot\n");
     arch::interrupts::init();
     log!("[ok] GDT / TSS / IDT\n");
+
+    // Execute a small function compiled from Recontrol and linked directly into
+    // this no_std kernel image. This validates the compiler/kernel ABI before
+    // relying on Recontrol for larger system components.
+    recontrol::verify();
+
     let offset = info
         .physical_memory_offset
         .into_option()
