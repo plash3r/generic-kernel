@@ -113,7 +113,7 @@ if args.iso:
 else:
     boot_drive = f"format=raw,file={image}"
     if args.storage:
-        boot_drive += ",readonly=on"
+        boot_drive += ",snapshot=on"
     cmd += ["-drive", boot_drive]
 
 if args.storage:
