@@ -748,12 +748,7 @@ fn processes(console: &mut Console<'_>) {
                 let _ = writeln!(
                     console,
                     "  pid={:<3} {:<12} {:<7} entry={:#x} cr3={:#x} fds={}",
-                    process.pid,
-                    process.name,
-                    state,
-                    process.entry,
-                    process.cr3,
-                    process.fd_count
+                    process.pid, process.name, state, process.entry, process.cr3, process.fd_count
                 );
             }
         }
