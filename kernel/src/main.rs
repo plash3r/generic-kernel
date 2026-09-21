@@ -28,12 +28,10 @@ bootloader_api::entry_point!(kernel_main, config = &CONFIG);
 fn kernel_main(info: &'static mut BootInfo) -> ! {
     x86_64::instructions::interrupts::disable();
     arch::serial::init();
-    log!("GENERIC: boot
-");
+    log!("GENERIC: boot\n");
 
     arch::interrupts::init();
-    log!("[ok] GDT / TSS / IDT
-");
+    log!("[ok] GDT / TSS / IDT\n");
 
     // Execute a small function compiled from Recontrol and linked directly into
     // this no_std kernel image. This validates the compiler/kernel ABI before
@@ -49,8 +47,7 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
             as alloc::boxed::Box<dyn kernel_core::block::BlockDevice>),
         Ok(None) => None,
         Err(error) => {
-            log!("[warn] virtio-blk initialization failed: {}
-", error);
+            log!("[warn] virtio-blk initialization failed: {}\n", error);
             None
         }
     };
@@ -68,8 +65,7 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
         let framebuffer_info = framebuffer.info();
         arch::display::init(framebuffer);
         log!(
-            "[ok] display ABI bridge {}x{} XRGB8888 userspace present
-",
+            "[ok] display ABI bridge {}x{} XRGB8888 userspace present\n",
             framebuffer_info.width,
             framebuffer_info.height
         );
@@ -78,26 +74,21 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
     process::init_probe();
 
     x86_64::instructions::interrupts::int3();
-    log!("[ok] breakpoint returned
-");
-    log!("GENERIC: READY
-");
+    log!("[ok] breakpoint returned\n");
+    log!("GENERIC: READY\n");
 
     #[cfg(not(feature = "smoke"))]
     if arch::display::is_ready() {
         match process::launch_graphical_shell() {
-            Ok(exit) => log!("[warn] userspace graphical shell exited with {}
-", exit),
-            Err(error) => log!("[warn] graphical shell unavailable: {}
-", error),
+            Ok(exit) => log!("[warn] userspace graphical shell exited with {}\n", exit),
+            Err(error) => log!("[warn] graphical shell unavailable: {}\n", error),
         }
     }
 
     if let Some(framebuffer) = info.framebuffer.as_mut() {
         let framebuffer_info = framebuffer.info();
         log!(
-            "[ok] framebuffer {}x{} ready for console
-",
+            "[ok] framebuffer {}x{} ready for console\n",
             framebuffer_info.width,
             framebuffer_info.height
         );
@@ -105,12 +96,10 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
         #[cfg(feature = "smoke")]
         {
             let mut console = arch::framebuffer::Console::new(framebuffer);
-            for byte in b"GENERIC framebuffer console smoke
-" {
+            for byte in b"GENERIC framebuffer console smoke\n" {
                 console.write_byte(*byte);
             }
-            log!("[ok] framebuffer console smoke
-");
+            log!("[ok] framebuffer console smoke\n");
             arch::exit(true);
         }
 
@@ -121,8 +110,7 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
         }
     }
 
-    log!("[warn] no framebuffer supplied by bootloader
-");
+    log!("[warn] no framebuffer supplied by bootloader\n");
 
     #[cfg(feature = "smoke")]
     arch::exit(true);
@@ -133,8 +121,7 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
-    log!("GENERIC: PANIC: {}
-", info);
+    log!("GENERIC: PANIC: {}\n", info);
     #[cfg(feature = "smoke")]
     arch::exit(false);
     #[cfg(not(feature = "smoke"))]
