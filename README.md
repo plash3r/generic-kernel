@@ -22,11 +22,16 @@ The x86_64 path provides a no_std Rust kernel with:
   coalescing;
 - Generic-owned four-level page tables and CR3, with supervisor write protection;
 - x86_64 page-table mapping for kernel-owned virtual ranges;
-- a mapped 2 MiB kernel heap that is writable, non-executable and surrounded by
+- a mapped 16 MiB kernel heap that is writable, non-executable and surrounded by
   unmapped guard pages;
 - heap allocation/deallocation smoke validation;
+- ACPI RSDT/XSDT/MADT discovery with Generic-owned xAPIC/IOAPIC MMIO mappings;
+- interrupt-routed PIT 100 Hz system timer;
+- interrupt-driven PS/2 keyboard and mouse event queues with wheel detection;
+- software double-buffer graphics with clipped primitives and anti-aliased text;
+- first kernel-mode graphical desktop/window manager with z-order, dragging,
+  minimize/close, taskbar, start menu, cursor and VFS-backed Files window;
 - runtime-switchable framebuffer fonts: Noto Sans Mono presets plus custom PSF2 loading from VFS;
-- PS/2 keyboard input;
 - generated initramfs unpacked into the writable ramfs root;
 - generic VFS namespace with mount routing;
 - block-device abstraction, legacy virtio-blk PCI driver and PMM-backed DMA;
@@ -41,7 +46,10 @@ A successful memory bring-up includes diagnostics similar to:
 
     [ok] physical frames ..., allocate/free/coalesce
     [ok] PMM ... MiB managed in ... regions, ... MiB free
-    [ok] kernel heap 2048 KiB @ 0x444400000000, 512 pages, RW+NX, guard pages
+    [ok] kernel heap 16384 KiB @ 0x444400000000, 4096 pages, RW+NX, guard pages
+    [ok] xAPIC id=... + ... IOAPIC(s), IRQ0/1/12 routed
+    [ok] interrupt event loop + PIT timer 100 Hz (... ticks)
+    [ok] desktop compositor ...
 
 ## Build a VirtualBox ISO
 
@@ -83,8 +91,9 @@ Attach:
     build/generic.iso
 
 to the VM's optical drive and start it. EFI may be enabled or disabled. The
-Generic framebuffer terminal should appear in the VM window. Click inside the
-window and type HELP.
+Generic graphical desktop should appear in the VM window. Click inside the
+window to use the PS/2 mouse. Press F12 or click Console to enter the text shell;
+use `kernel desktop` or F12 to return to the desktop.
 
 Do not use the older build/generic-uefi.iso from an earlier revision; that
 image was UEFI-only.
@@ -96,6 +105,7 @@ The kernel console uses one primary system namespace:
     kernel help
     kernel status
     kernel diagnostics
+    kernel desktop
     kernel memory
     kernel video
     kernel font list
@@ -170,7 +180,7 @@ checks that the generated LLVM IR is reproducible.
 - userspace/recontrol/ — Recontrol source, generated IR and compiler revision.
 - tools/image/ — BIOS and UEFI disk-image builder.
 - scripts/ — build, ISO, QEMU, x128 and Recontrol commands.
-- docs/ — architecture decisions, Linux reference notes, roadmap, kernel command, fonts and validation.
+- docs/ — architecture decisions, Linux reference notes, roadmap, GUI, kernel command, fonts and validation.
 
 ## Current boundary
 
@@ -180,6 +190,8 @@ kernel heap, but it is not yet a complete general-purpose desktop/server OS.
 Generic now deep-copies the loader page-table tree into PMM-owned frames before
 mapping its heap. See docs/MEMORY.md for the handoff contract and tests.
 The protected-memory stage still needs full kernel-section W^X enforcement and
-richer fault coverage. Later stages add
-APIC/IOAPIC and timekeeping, scheduler/SMP, ring 3, syscalls, user ELF loading,
-production-grade storage drivers/filesystem recovery, mature input/graphics drivers and networking.
+richer fault coverage. GUI Phase 1 now provides ACPI/APIC interrupt routing,
+timekeeping, PS/2 pointer input, double-buffer graphics and a kernel desktop.
+The next architecture stages add scheduler/SMP, ring 3, syscalls, user ELF
+loading, IPC/shared-memory GUI surfaces, production-grade storage
+drivers/filesystem recovery, USB HID, accelerated graphics and networking.

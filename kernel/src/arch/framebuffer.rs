@@ -143,7 +143,10 @@ pub struct Console<'a> {
 impl<'a> Console<'a> {
     pub fn new(framebuffer: &'a mut FrameBuffer) -> Self {
         let info = framebuffer.info();
-        let buffer = framebuffer.buffer_mut();
+        Self::from_buffer(framebuffer.buffer_mut(), info)
+    }
+
+    pub fn from_buffer(buffer: &'a mut [u8], info: FrameBufferInfo) -> Self {
         let mut console = Self {
             buffer,
             info,

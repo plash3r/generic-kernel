@@ -175,6 +175,10 @@ if code != 33 or b"GENERIC: READY" not in output or b"GENERIC: PANIC" in output:
     sys.exit(f"smoke FAILED (QEMU exit={code}); see build/{log_name}")
 if b"[ok] Generic-owned CR3 " not in output:
     sys.exit(f"page-table ownership smoke FAILED; see build/{log_name}")
+if b"[ok] interrupt event loop + PIT timer 100 Hz" not in output:
+    sys.exit(f"interrupt/timer smoke FAILED; see build/{log_name}")
+if b"[ok] desktop compositor " not in output:
+    sys.exit(f"desktop compositor smoke FAILED; see build/{log_name}")
 if args.storage and b"GenericFS" not in output:
     sys.exit(f"storage smoke FAILED; see build/{log_name}")
 if args.expect_storage_recovered and b"GenericFS recovered persistent volume" not in output:
@@ -184,9 +188,9 @@ if args.iso:
     firmware_name = "BIOS" if args.bios else "UEFI"
     print(
         f"smoke PASSED from hybrid ISO ({firmware_name}): "
-        "boot, framebuffer init, physical RAM and breakpoint"
+        "boot, APIC/timer, desktop compositor, physical RAM and breakpoint"
     )
 elif args.storage:
-    print("smoke PASSED with persistent virtio-blk GenericFS")
+    print("smoke PASSED with APIC/timer, desktop compositor and persistent virtio-blk GenericFS")
 else:
-    print("smoke PASSED from disk: boot, framebuffer init, physical RAM and breakpoint")
+    print("smoke PASSED from disk: boot, APIC/timer, desktop compositor, physical RAM and breakpoint")

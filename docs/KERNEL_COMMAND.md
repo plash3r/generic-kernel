@@ -10,6 +10,7 @@ command tree instead of being spread across unrelated top-level commands.
     kernel help
     kernel status
     kernel diagnostics
+    kernel desktop
     kernel version
     kernel memory
     kernel video
@@ -44,6 +45,13 @@ GenericFS persistence when mounted, and the Recontrol freestanding ABI.
 Each check is reported as `[ok]`, `[warn]` or `[fail]`, followed by a
 summary. A missing optional persistent GenericFS mount is a warning rather than
 a failure. `kernel diag` is accepted as a short alias.
+
+### Desktop
+
+    kernel desktop
+
+switches the framebuffer shell back to the Generic graphical desktop. F12 is a
+keyboard shortcut for the same mode switch in both directions.
 
 ### Font settings
 

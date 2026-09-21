@@ -7,10 +7,12 @@
 extern crate alloc;
 
 mod arch;
+mod desktop;
 mod initramfs;
 mod mm;
 mod recontrol;
 mod shell;
+mod ui;
 mod vfs;
 
 use bootloader_api::{config::Mapping, BootInfo, BootloaderConfig};
@@ -60,20 +62,22 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
     log!("GENERIC: READY\n");
 
     if let Some(framebuffer) = info.framebuffer.as_mut() {
-        let mut console = arch::framebuffer::Console::new(framebuffer);
-        console.set_accent_color();
-        use core::fmt::Write;
-        let width = console.width();
-        let height = console.height();
-        let _ = writeln!(console, "GENERIC framebuffer {width}x{height} READY");
-        console.set_default_color();
-        log!("[ok] framebuffer console {}x{}\n", width, height);
+        let framebuffer_info = framebuffer.info();
+        log!(
+            "[ok] framebuffer {}x{} ready for graphics\n",
+            framebuffer_info.width,
+            framebuffer_info.height
+        );
 
         #[cfg(feature = "smoke")]
-        arch::exit(true);
+        {
+            arch::graphics::smoke(framebuffer);
+            desktop::smoke(arch::graphics::Display::new(framebuffer));
+            arch::exit(true);
+        }
 
         #[cfg(not(feature = "smoke"))]
-        shell::run(console);
+        ui::run(framebuffer);
     }
 
     log!("[warn] no framebuffer supplied by bootloader\n");

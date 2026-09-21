@@ -9,7 +9,12 @@ use kernel_core::vfs::NodeKind;
 const MAX_LINE: usize = 256;
 const MAX_CUSTOM_FONT_BYTES: u64 = 512 * 1024;
 
-pub fn run(mut console: Console<'_>) -> ! {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ShellExit {
+    Desktop,
+}
+
+pub fn run(mut console: Console<'_>) -> ShellExit {
     let mut keyboard = Keyboard::new();
     keyboard.drain();
     let mut cwd = String::from("/");
@@ -41,11 +46,20 @@ pub fn run(mut console: Console<'_>) -> ! {
                     console.write_byte(b'\n');
                     break;
                 }
+                Key::F12 => {
+                    console.write_byte(b'\n');
+                    let _ = writeln!(console, "Switching to Generic desktop...");
+                    return ShellExit::Desktop;
+                }
                 _ => {}
             }
         }
 
         let input = core::str::from_utf8(&line[..len]).unwrap_or("");
+        if input.trim().eq_ignore_ascii_case("kernel desktop") {
+            let _ = writeln!(console, "Switching to Generic desktop...");
+            return ShellExit::Desktop;
+        }
         execute(&mut console, &mut cwd, input);
     }
 }
@@ -56,7 +70,7 @@ fn banner(console: &mut Console<'_>) {
     let _ = writeln!(console, "GENERIC OS 0.1.0");
     console.set_default_color();
     let _ = writeln!(console, "Interactive framebuffer console + VFS");
-    let _ = writeln!(console, "Type HELP to list commands.");
+    let _ = writeln!(console, "Type HELP to list commands. F12 returns to the desktop.");
     let _ = writeln!(console);
 }
 
@@ -203,6 +217,7 @@ fn kernel_help(console: &mut Console<'_>) {
     let _ = writeln!(console, "  HELP                 show kernel command help");
     let _ = writeln!(console, "  STATUS               combined kernel status");
     let _ = writeln!(console, "  DIAGNOSTICS          run kernel self-checks");
+    let _ = writeln!(console, "  DESKTOP              switch to graphical desktop");
     let _ = writeln!(console, "  VERSION              kernel version");
     let _ = writeln!(console, "  MEMORY               physical memory and heap");
     let _ = writeln!(console, "  VIDEO                framebuffer information");
@@ -217,6 +232,7 @@ fn kernel_help(console: &mut Console<'_>) {
     let _ = writeln!(console, "Examples:");
     let _ = writeln!(console, "  KERNEL STATUS");
     let _ = writeln!(console, "  KERNEL DIAGNOSTICS");
+    let _ = writeln!(console, "  KERNEL DESKTOP");
     let _ = writeln!(console, "  KERNEL FONT LIST");
     let _ = writeln!(console, "  KERNEL FONT SET noto20");
     let _ = writeln!(console, "  KERNEL FONT LOAD /mnt/fonts/custom.psf");
@@ -311,6 +327,32 @@ fn kernel_diagnostics(console: &mut Console<'_>) {
         );
     } else {
         summary.fail(console, format_args!("memory accounting is inconsistent"));
+    }
+
+    let apic = crate::arch::apic::diagnostics();
+    if apic.initialized && apic.io_apic_count > 0 {
+        summary.ok(
+            console,
+            format_args!(
+                "interrupt controller: xAPIC id={} with {} IOAPIC(s)",
+                apic.local_apic_id, apic.io_apic_count
+            ),
+        );
+    } else {
+        summary.fail(console, format_args!("APIC/IOAPIC is not initialized"));
+    }
+
+    if crate::arch::timer::initialized() && crate::arch::timer::ticks() > 0 {
+        summary.ok(
+            console,
+            format_args!(
+                "system timer: {} Hz, {} ticks",
+                crate::arch::timer::HZ,
+                crate::arch::timer::ticks()
+            ),
+        );
+    } else {
+        summary.fail(console, format_args!("system timer is not advancing"));
     }
 
     match crate::mm::runtime_diagnostics() {

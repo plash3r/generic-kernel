@@ -110,3 +110,13 @@ pub fn interrupt_byte(byte: u8) {
 pub fn poll_event() -> Option<MouseEvent> {
     x86_64::instructions::interrupts::without_interrupts(|| MOUSE.lock().pop())
 }
+
+pub fn drain() {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        let mut mouse = MOUSE.lock();
+        mouse.read = 0;
+        mouse.write = 0;
+        mouse.len = 0;
+        mouse.packet_index = 0;
+    });
+}
