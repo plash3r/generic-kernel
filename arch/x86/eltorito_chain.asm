@@ -72,9 +72,9 @@ int13:
     jz success
     mov [cs:count + DELTA], ax
     mov ax, [ds:si + 4]
-    mov [cs:off + DELTA], ax
+    mov [cs:bufoff + DELTA], ax
     mov ax, [ds:si + 6]
-    mov [cs:seg + DELTA], ax
+    mov [cs:bufseg + DELTA], ax
     mov eax, [ds:si + 12]
     test eax, eax
     jnz fail
@@ -108,8 +108,8 @@ next:
     or cl, al
     mov dh, [cs:head + DELTA]
     mov dl, [cs:drive + DELTA]
-    mov bx, [cs:off + DELTA]
-    mov ax, [cs:seg + DELTA]
+    mov bx, [cs:bufoff + DELTA]
+    mov ax, [cs:bufseg + DELTA]
     mov es, ax
     mov ax, 0x0201
     pushf
@@ -117,7 +117,7 @@ next:
     jc fail
 
     inc dword [cs:lba + DELTA]
-    add word [cs:off + DELTA], 512
+    add word [cs:bufoff + DELTA], 512
     dec word [cs:count + DELTA]
     jnz next
 
@@ -142,8 +142,8 @@ sector: db 0
 align 2
 old13:  dw 0, 0
 count:  dw 0
-off:    dw 0
-seg:    dw 0
+bufoff: dw 0
+bufseg: dw 0
 cyl:    dw 0
 lba:    dd 0
 
