@@ -1,4 +1,5 @@
 use crate::arch::mouse;
+use core::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use x86_64::instructions::port::Port;
 
 const DATA: u16 = 0x60;
@@ -8,6 +9,13 @@ const STATUS_INPUT_FULL: u8 = 1 << 1;
 const STATUS_MOUSE_DATA: u8 = 1 << 5;
 const ACK: u8 = 0xfa;
 const WAIT_LIMIT: usize = 200_000;
+
+const STATUS_KEYBOARD: u8 = 1 << 0;
+const STATUS_MOUSE: u8 = 1 << 1;
+const STATUS_WHEEL: u8 = 1 << 2;
+
+static INITIALIZED: AtomicBool = AtomicBool::new(false);
+static ACTIVE_STATUS: AtomicU8 = AtomicU8::new(0);
 
 #[derive(Clone, Copy, Debug)]
 pub struct Status {
@@ -54,17 +62,43 @@ pub fn init() -> Status {
         }
     }
 
-    crate::log!(
-        "[ok] PS/2 input keyboard={} mouse={} wheel={}\n",
-        keyboard,
-        mouse_present,
-        wheel
-    );
-    Status {
+    let status = Status {
         keyboard,
         mouse: mouse_present,
         wheel,
+    };
+    let mut bits = 0;
+    if status.keyboard {
+        bits |= STATUS_KEYBOARD;
     }
+    if status.mouse {
+        bits |= STATUS_MOUSE;
+    }
+    if status.wheel {
+        bits |= STATUS_WHEEL;
+    }
+    ACTIVE_STATUS.store(bits, Ordering::SeqCst);
+    INITIALIZED.store(true, Ordering::SeqCst);
+
+    crate::log!(
+        "[ok] PS/2 input keyboard={} mouse={} wheel={}\n",
+        status.keyboard,
+        status.mouse,
+        status.wheel
+    );
+    status
+}
+
+pub fn diagnostics() -> Option<Status> {
+    if !INITIALIZED.load(Ordering::SeqCst) {
+        return None;
+    }
+    let bits = ACTIVE_STATUS.load(Ordering::SeqCst);
+    Some(Status {
+        keyboard: bits & STATUS_KEYBOARD != 0,
+        mouse: bits & STATUS_MOUSE != 0,
+        wheel: bits & STATUS_WHEEL != 0,
+    })
 }
 
 pub fn read_interrupt_data(expect_mouse: bool) -> Option<u8> {

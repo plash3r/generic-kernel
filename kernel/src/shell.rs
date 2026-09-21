@@ -361,6 +361,28 @@ fn kernel_diagnostics(console: &mut Console<'_>) {
         summary.fail(console, format_args!("system timer is not advancing"));
     }
 
+    match crate::arch::ps2::diagnostics() {
+        Some(input) if input.keyboard && input.mouse => {
+            summary.ok(
+                console,
+                format_args!(
+                    "PS/2 input: keyboard=true mouse=true wheel={}",
+                    input.wheel
+                ),
+            );
+        }
+        Some(input) => {
+            summary.warn(
+                console,
+                format_args!(
+                    "PS/2 input partial: keyboard={} mouse={} wheel={}",
+                    input.keyboard, input.mouse, input.wheel
+                ),
+            );
+        }
+        None => summary.warn(console, format_args!("PS/2 input status unavailable")),
+    }
+
     match crate::mm::runtime_diagnostics() {
         Some(memory) => {
             if memory.cr3 != 0 && memory.write_protect {

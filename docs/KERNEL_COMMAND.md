@@ -38,7 +38,8 @@ prints a compact combined view of:
     kernel diagnostics
 
 runs non-destructive runtime self-checks across the active kernel. The command
-checks PMM/heap accounting, the live CR3 and supervisor write-protect bit, heap
+checks PMM/heap accounting, APIC/IOAPIC state, the advancing system timer,
+PS/2 keyboard/mouse status, the live CR3 and supervisor write-protect bit, heap
 mapping and guard pages, framebuffer/font geometry, VFS/initramfs access,
 GenericFS persistence when mounted, and the Recontrol freestanding ABI.
 

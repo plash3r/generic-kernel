@@ -1,16 +1,22 @@
 # Generic interactive console
 
-Generic has an interactive text console rendered into a pixel framebuffer.
+Generic has an interrupt-driven text console rendered into the boot framebuffer.
+It shares the same framebuffer and input platform as the graphical desktop.
 
-Keyboard input currently uses the PS/2/i8042 compatibility controller in
-polling mode. This keeps the early shell usable before hardware IRQ/APIC support
-is enabled.
+Keyboard scancodes arrive through the i8042 PS/2 controller on IOAPIC-routed
+IRQ1 and are decoded from a bounded kernel queue. The mouse uses IRQ12 for the
+graphical desktop. F12 switches between the text console and the desktop without
+rebooting.
 
-Available commands include help, clear, echo, uname, version, mem, video,
-recontrol, whoami, pwd, ls, reboot and halt.
+The primary system namespace is `KERNEL`; use `kernel help` for status,
+diagnostics, desktop switching, font settings, mounts and machine control.
+Filesystem commands operate through Generic VFS and GenericFS when mounted.
 
-The shell is still a kernel console. User processes, a VFS, pipes, permissions
-and executable programs are later roadmap stages.
+Useful mode-switch commands:
+
+    kernel desktop
+
+or press F12.
 
 ## QEMU
 
@@ -23,16 +29,18 @@ Legacy BIOS:
 
     python3 scripts/run.py --iso --bios --graphical
 
+Normal framebuffer boots start in the graphical desktop. Use F12 or the
+desktop Console control to enter this text console.
+
 ## VirtualBox
 
 Build:
 
     bash scripts/build-iso.sh
 
-Attach build/generic.iso as the virtual optical disc.
+Attach `build/generic.iso` as the virtual optical disc. The same hybrid ISO has
+legacy BIOS and UEFI El Torito boot entries.
 
-The ISO contains both legacy BIOS and UEFI El Torito boot entries, so VirtualBox
-can boot the same file with EFI either enabled or disabled. One CPU and 256 MiB
-of RAM are sufficient for the current console.
-
-The x128 reference target is separate and is not supported by VirtualBox.
+The current GUI input path uses the PS/2/i8042 compatibility controller. USB HID
+is a later hardware-qualification step. The x128 reference target is separate
+and is not supported by VirtualBox.
