@@ -54,9 +54,11 @@ hang:
     jmp hang
 
 int13:
-    cmp ah, 0x42
-    jne chain
     cmp dl, [cs:drive + DELTA]
+    jne chain
+    cmp ah, 0x41
+    je extensions
+    cmp ah, 0x42
     jne chain
 
     push bp
@@ -130,6 +132,18 @@ done:
     pop es
     pop ds
     popad
+    pop bp
+    iret
+
+extensions:
+    ; bootloader 0.11 checks EDD before its first LBA read. SeaBIOS rejects
+    ; AH=41 for El Torito emulation, so report the subset provided by this shim.
+    push bp
+    mov bp, sp
+    mov bx, 0xaa55
+    mov cx, 0x0001
+    mov ah, 0x30
+    and word [ss:bp + 6], 0xfffe
     pop bp
     iret
 
