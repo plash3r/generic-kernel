@@ -137,7 +137,9 @@ impl GenericFs {
         let sector = INODE_TABLE_START + (index / INODES_PER_SECTOR) as u64;
         let offset = (index % INODES_PER_SECTOR) * INODE_SIZE;
         let mut raw = [0u8; SECTOR_SIZE];
-        self.device.read_sector(sector, &mut raw).map_err(map_block)?;
+        self.device
+            .read_sector(sector, &mut raw)
+            .map_err(map_block)?;
         encode_inode(&mut raw[offset..offset + INODE_SIZE], value);
         self.device.write_sector(sector, &raw).map_err(map_block)
     }
