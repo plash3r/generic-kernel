@@ -1,8 +1,4 @@
-use alloc::{
-    boxed::Box,
-    string::String,
-    vec::Vec,
-};
+use alloc::{boxed::Box, string::String, vec::Vec};
 use kernel_core::vfs::{
     normalize_path, DirEntry, Metadata, MountInfo, NodeKind, RamFs, Vfs, VfsError,
 };
@@ -47,12 +43,11 @@ pub fn init() {
             .len,
         11
     );
-    assert!(
-        vfs.read_dir("/tmp/.vfs-smoke")
-            .expect("VFS smoke readdir failed")
-            .iter()
-            .any(|entry| entry.name == "probe")
-    );
+    assert!(vfs
+        .read_dir("/tmp/.vfs-smoke")
+        .expect("VFS smoke readdir failed")
+        .iter()
+        .any(|entry| entry.name == "probe"));
     vfs.remove("/tmp/.vfs-smoke/probe")
         .expect("VFS smoke unlink failed");
     vfs.remove("/tmp/.vfs-smoke")
@@ -147,9 +142,7 @@ fn seed_file(vfs: &mut Vfs, path: &str, data: &[u8]) {
         .unwrap_or_else(|error| panic!("failed to seed {path}: {error}"));
 }
 
-fn with_vfs<T>(
-    operation: impl FnOnce(&mut Vfs) -> Result<T, VfsError>,
-) -> Result<T, VfsError> {
+fn with_vfs<T>(operation: impl FnOnce(&mut Vfs) -> Result<T, VfsError>) -> Result<T, VfsError> {
     let mut global = VFS.lock();
     let vfs = global.as_mut().expect("VFS used before initialization");
     operation(vfs)

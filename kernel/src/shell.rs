@@ -141,7 +141,10 @@ fn help(console: &mut Console<'_>) {
     let _ = writeln!(console, "  MKDIR PATH           create directory");
     let _ = writeln!(console, "  WRITE PATH TEXT      create/truncate and write");
     let _ = writeln!(console, "  APPEND PATH TEXT     append to file");
-    let _ = writeln!(console, "  RM PATH              unlink file/empty directory");
+    let _ = writeln!(
+        console,
+        "  RM PATH              unlink file/empty directory"
+    );
     let _ = writeln!(console, "  STAT PATH            inode/type/size");
     let _ = writeln!(console, "  MOUNTS               mounted filesystems");
     let _ = writeln!(console, "  RECONTROL            call Recontrol code");
@@ -196,11 +199,7 @@ fn list_directory(console: &mut Console<'_>, cwd: &str, args: &str) {
                         let _ = writeln!(console, "{}/", entry.name);
                     }
                     NodeKind::File => {
-                        let _ = writeln!(
-                            console,
-                            "{}  {} bytes",
-                            entry.name, entry.metadata.len
-                        );
+                        let _ = writeln!(console, "{}  {} bytes", entry.name, entry.metadata.len);
                     }
                 }
             }
@@ -271,9 +270,7 @@ fn write_file(console: &mut Console<'_>, cwd: &str, args: &str, append: bool) {
 
     let path = match crate::vfs::canonicalize(cwd, raw_path) {
         Ok(path) => path,
-        Err(error) => {
-            return vfs_error(console, if append { "append" } else { "write" }, error)
-        }
+        Err(error) => return vfs_error(console, if append { "append" } else { "write" }, error),
     };
 
     if let Err(error) = crate::vfs::write_file(&path, text.as_bytes(), append) {
@@ -329,10 +326,6 @@ fn required_path(
     }
 }
 
-fn vfs_error(
-    console: &mut Console<'_>,
-    command: &str,
-    error: kernel_core::vfs::VfsError,
-) {
+fn vfs_error(console: &mut Console<'_>, command: &str, error: kernel_core::vfs::VfsError) {
     let _ = writeln!(console, "{command}: {error}");
 }

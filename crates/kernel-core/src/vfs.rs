@@ -115,11 +115,7 @@ impl Vfs {
         }
     }
 
-    pub fn mount(
-        &mut self,
-        path: &str,
-        filesystem: Box<dyn FileSystem>,
-    ) -> Result<(), VfsError> {
+    pub fn mount(&mut self, path: &str, filesystem: Box<dyn FileSystem>) -> Result<(), VfsError> {
         let path = normalize_path("/", path)?;
         if path == "/" || self.mounts.iter().any(|mount| mount.path == path) {
             return Err(VfsError::AlreadyMounted);
@@ -189,12 +185,7 @@ impl Vfs {
         filesystem.remove(parent, &name)
     }
 
-    pub fn read(
-        &self,
-        path: &str,
-        offset: usize,
-        buffer: &mut [u8],
-    ) -> Result<usize, VfsError> {
+    pub fn read(&self, path: &str, offset: usize, buffer: &mut [u8]) -> Result<usize, VfsError> {
         let path = normalize_path("/", path)?;
         let (mount_index, relative) = self.route(&path);
         let filesystem = &*self.mounts[mount_index].filesystem;
@@ -333,10 +324,7 @@ fn resolve_inode(filesystem: &dyn FileSystem, path: &str) -> Result<Inode, VfsEr
     Ok(inode)
 }
 
-fn resolve_parent(
-    filesystem: &dyn FileSystem,
-    path: &str,
-) -> Result<(Inode, String), VfsError> {
+fn resolve_parent(filesystem: &dyn FileSystem, path: &str) -> Result<(Inode, String), VfsError> {
     if path == "/" {
         return Err(VfsError::RootImmutable);
     }
@@ -503,12 +491,7 @@ impl FileSystem for RamFs {
         self.create_node(parent, name, NodeKind::Directory)
     }
 
-    fn read(
-        &self,
-        inode: Inode,
-        offset: usize,
-        buffer: &mut [u8],
-    ) -> Result<usize, VfsError> {
+    fn read(&self, inode: Inode, offset: usize, buffer: &mut [u8]) -> Result<usize, VfsError> {
         let node = self.node(inode)?;
         if node.kind == NodeKind::Directory {
             return Err(VfsError::IsDirectory);
@@ -626,10 +609,7 @@ mod tests {
         let entries = vfs.read_dir("/tmp").unwrap();
         assert_eq!(entries[0].name, "a");
         assert_eq!(entries[1].name, "z");
-        assert_eq!(
-            vfs.remove("/tmp"),
-            Err(VfsError::DirectoryNotEmpty)
-        );
+        assert_eq!(vfs.remove("/tmp"), Err(VfsError::DirectoryNotEmpty));
 
         vfs.remove("/tmp/a").unwrap();
         vfs.remove("/tmp/z").unwrap();
@@ -658,16 +638,10 @@ mod tests {
     fn rejects_invalid_operations() {
         let mut vfs = vfs();
         vfs.create_file("/file").unwrap();
-        assert_eq!(
-            vfs.create_file("/file/child"),
-            Err(VfsError::NotDirectory)
-        );
+        assert_eq!(vfs.create_file("/file/child"), Err(VfsError::NotDirectory));
         assert_eq!(vfs.read_dir("/file"), Err(VfsError::NotDirectory));
         assert_eq!(vfs.read_all("/"), Err(VfsError::IsDirectory));
         assert_eq!(vfs.remove("/"), Err(VfsError::RootImmutable));
-        assert_eq!(
-            vfs.create_file("/file"),
-            Err(VfsError::AlreadyExists)
-        );
+        assert_eq!(vfs.create_file("/file"), Err(VfsError::AlreadyExists));
     }
 }
