@@ -178,8 +178,7 @@ impl<'a> Console<'a> {
             PixelFormat::Rgb => [color.r, color.g, color.b, 0],
             PixelFormat::Bgr => [color.b, color.g, color.r, 0],
             PixelFormat::U8 => {
-                let intensity =
-                    ((color.r as u16 + color.g as u16 + color.b as u16) / 3) as u8;
+                let intensity = ((color.r as u16 + color.g as u16 + color.b as u16) / 3) as u8;
                 [intensity, 0, 0, 0]
             }
             _ => [color.r, color.g, color.b, 0],
