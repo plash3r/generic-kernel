@@ -51,10 +51,7 @@ impl VirtioBlock {
         let base = device.io_base;
         write_u8(base + DEVICE_STATUS, 0);
         write_u8(base + DEVICE_STATUS, STATUS_ACKNOWLEDGE);
-        write_u8(
-            base + DEVICE_STATUS,
-            STATUS_ACKNOWLEDGE | STATUS_DRIVER,
-        );
+        write_u8(base + DEVICE_STATUS, STATUS_ACKNOWLEDGE | STATUS_DRIVER);
 
         let _features = read_u32(base + HOST_FEATURES);
         // Generic currently relies only on the mandatory legacy block feature set.
@@ -79,7 +76,8 @@ impl VirtioBlock {
 
         let queue = mm::allocate_dma(queue_pages).ok_or("no DMA memory for virtqueue")?;
         let request = mm::allocate_dma(1).ok_or("no DMA memory for virtio request")?;
-        let pfn = u32::try_from(queue.physical >> 12).map_err(|_| "virtqueue above legacy PFN range")?;
+        let pfn =
+            u32::try_from(queue.physical >> 12).map_err(|_| "virtqueue above legacy PFN range")?;
         write_u32(base + QUEUE_PFN, pfn);
 
         let capacity = read_u64_ports(base + DEVICE_CONFIG);
@@ -123,11 +121,7 @@ impl BlockDevice for VirtioBlock {
         self.capacity
     }
 
-    fn read_sector(
-        &self,
-        sector: u64,
-        buffer: &mut [u8; SECTOR_SIZE],
-    ) -> Result<(), BlockError> {
+    fn read_sector(&self, sector: u64, buffer: &mut [u8; SECTOR_SIZE]) -> Result<(), BlockError> {
         if sector >= self.capacity {
             return Err(BlockError::OutOfRange);
         }
@@ -144,11 +138,7 @@ impl BlockDevice for VirtioBlock {
         Ok(())
     }
 
-    fn write_sector(
-        &self,
-        sector: u64,
-        buffer: &[u8; SECTOR_SIZE],
-    ) -> Result<(), BlockError> {
+    fn write_sector(&self, sector: u64, buffer: &[u8; SECTOR_SIZE]) -> Result<(), BlockError> {
         if sector >= self.capacity {
             return Err(BlockError::OutOfRange);
         }
@@ -179,10 +169,7 @@ impl State {
             write_u32_mem(header, request_type);
             write_u32_mem(header.add(4), 0);
             write_u64_mem(header.add(8), sector);
-            core::ptr::write_volatile(
-                (self.request_virt + REQUEST_STATUS_OFFSET) as *mut u8,
-                0xff,
-            );
+            core::ptr::write_volatile((self.request_virt + REQUEST_STATUS_OFFSET) as *mut u8, 0xff);
         }
 
         let data_flags = DESC_NEXT
@@ -191,13 +178,7 @@ impl State {
             } else {
                 0
             };
-        self.write_desc(
-            0,
-            self.request_phys,
-            16,
-            DESC_NEXT,
-            1,
-        );
+        self.write_desc(0, self.request_phys, 16, DESC_NEXT, 1);
         self.write_desc(
             1,
             self.request_phys + REQUEST_DATA_OFFSET,
@@ -251,9 +232,7 @@ impl State {
         compiler_fence(Ordering::SeqCst);
         // SAFETY: the status byte is written by the device after request completion.
         let status = unsafe {
-            core::ptr::read_volatile(
-                (self.request_virt + REQUEST_STATUS_OFFSET) as *const u8,
-            )
+            core::ptr::read_volatile((self.request_virt + REQUEST_STATUS_OFFSET) as *const u8)
         };
         if status == 0 {
             Ok(())

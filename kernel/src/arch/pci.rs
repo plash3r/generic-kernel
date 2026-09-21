@@ -32,13 +32,7 @@ pub fn find_legacy_virtio_block() -> Option<PciDevice> {
                 }
                 let io_base = (bar0 & !0x3) as u16;
                 let command = read_u16(bus as u8, device, function, 0x04);
-                write_u16(
-                    bus as u8,
-                    device,
-                    function,
-                    0x04,
-                    command | 0x0001 | 0x0004,
-                );
+                write_u16(bus as u8, device, function, 0x04, command | 0x0001 | 0x0004);
                 return Some(PciDevice {
                     bus: bus as u8,
                     device,

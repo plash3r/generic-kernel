@@ -22,14 +22,6 @@ impl fmt::Display for BlockError {
 /// Minimal synchronous sector device used below the Generic VFS.
 pub trait BlockDevice: Send + Sync {
     fn sector_count(&self) -> u64;
-    fn read_sector(
-        &self,
-        sector: u64,
-        buffer: &mut [u8; SECTOR_SIZE],
-    ) -> Result<(), BlockError>;
-    fn write_sector(
-        &self,
-        sector: u64,
-        buffer: &[u8; SECTOR_SIZE],
-    ) -> Result<(), BlockError>;
+    fn read_sector(&self, sector: u64, buffer: &mut [u8; SECTOR_SIZE]) -> Result<(), BlockError>;
+    fn write_sector(&self, sector: u64, buffer: &[u8; SECTOR_SIZE]) -> Result<(), BlockError>;
 }

@@ -41,10 +41,8 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
     mm::init(info);
 
     let block_device = match arch::virtio_blk::VirtioBlock::probe() {
-        Ok(Some(device)) => Some(
-            alloc::boxed::Box::new(device)
-                as alloc::boxed::Box<dyn kernel_core::block::BlockDevice>
-        ),
+        Ok(Some(device)) => Some(alloc::boxed::Box::new(device)
+            as alloc::boxed::Box<dyn kernel_core::block::BlockDevice>),
         Ok(None) => None,
         Err(error) => {
             log!("[warn] virtio-blk initialization failed: {}\n", error);

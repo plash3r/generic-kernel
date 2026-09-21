@@ -2,9 +2,7 @@ use alloc::{boxed::Box, string::String, vec::Vec};
 use kernel_core::{
     block::BlockDevice,
     genericfs::GenericFs,
-    vfs::{
-        normalize_path, DirEntry, Metadata, MountInfo, NodeKind, RamFs, Vfs, VfsError,
-    },
+    vfs::{normalize_path, DirEntry, Metadata, MountInfo, NodeKind, RamFs, Vfs, VfsError},
 };
 use spin::Mutex;
 
@@ -20,7 +18,10 @@ pub fn init(block_device: Option<Box<dyn BlockDevice>>) {
 
     let initramfs_files =
         crate::initramfs::unpack(&mut vfs).expect("failed to unpack Generic initramfs");
-    crate::log!("[ok] initramfs {} files loaded into root ramfs\n", initramfs_files);
+    crate::log!(
+        "[ok] initramfs {} files loaded into root ramfs\n",
+        initramfs_files
+    );
 
     verify_ramfs(&mut vfs);
 

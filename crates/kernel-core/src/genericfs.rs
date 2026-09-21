@@ -57,8 +57,8 @@ impl DiskInode {
 
     fn name(&self) -> Result<String, VfsError> {
         let len = self.name_len as usize;
-        let text = core::str::from_utf8(&self.name[..len])
-            .map_err(|_| VfsError::CorruptFilesystem)?;
+        let text =
+            core::str::from_utf8(&self.name[..len]).map_err(|_| VfsError::CorruptFilesystem)?;
         Ok(String::from(text))
     }
 }
@@ -78,7 +78,9 @@ impl GenericFs {
 
         let fs = Self { device };
         let mut superblock = [0u8; SECTOR_SIZE];
-        fs.device.read_sector(0, &mut superblock).map_err(map_block)?;
+        fs.device
+            .read_sector(0, &mut superblock)
+            .map_err(map_block)?;
 
         if &superblock[..8] == MAGIC {
             if read_u32(&superblock, 8) != VERSION
@@ -113,7 +115,9 @@ impl GenericFs {
         write_u32(&mut superblock, 12, INODE_COUNT as u32);
         write_u64(&mut superblock, 16, DATA_START);
         write_u64(&mut superblock, 24, self.device.sector_count());
-        self.device.write_sector(0, &superblock).map_err(map_block)?;
+        self.device
+            .write_sector(0, &superblock)
+            .map_err(map_block)?;
         self.write_inode(1, DiskInode::root())
     }
 
@@ -122,7 +126,9 @@ impl GenericFs {
         let sector = INODE_TABLE_START + (index / INODES_PER_SECTOR) as u64;
         let offset = (index % INODES_PER_SECTOR) * INODE_SIZE;
         let mut raw = [0u8; SECTOR_SIZE];
-        self.device.read_sector(sector, &mut raw).map_err(map_block)?;
+        self.device
+            .read_sector(sector, &mut raw)
+            .map_err(map_block)?;
         decode_inode(&raw[offset..offset + INODE_SIZE])
     }
 
@@ -240,12 +246,7 @@ impl GenericFs {
         Ok(())
     }
 
-    fn zero_range(
-        &self,
-        entry: &DiskInode,
-        start: usize,
-        end: usize,
-    ) -> Result<(), VfsError> {
+    fn zero_range(&self, entry: &DiskInode, start: usize, end: usize) -> Result<(), VfsError> {
         if start >= end {
             return Ok(());
         }
@@ -318,12 +319,7 @@ impl FileSystem for GenericFs {
         self.create(parent, name, 2)
     }
 
-    fn read(
-        &self,
-        inode: Inode,
-        offset: usize,
-        buffer: &mut [u8],
-    ) -> Result<usize, VfsError> {
+    fn read(&self, inode: Inode, offset: usize, buffer: &mut [u8]) -> Result<usize, VfsError> {
         let entry = self.read_inode(inode)?;
         if entry.node_kind()? == NodeKind::Directory {
             return Err(VfsError::IsDirectory);
@@ -529,11 +525,7 @@ mod tests {
             Ok(())
         }
 
-        fn write_sector(
-            &self,
-            sector: u64,
-            buffer: &[u8; SECTOR_SIZE],
-        ) -> Result<(), BlockError> {
+        fn write_sector(&self, sector: u64, buffer: &[u8; SECTOR_SIZE]) -> Result<(), BlockError> {
             if sector >= self.sectors {
                 return Err(BlockError::OutOfRange);
             }
