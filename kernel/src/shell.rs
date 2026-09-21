@@ -272,8 +272,8 @@ fn kernel_status(console: &mut Console<'_>) {
     let processes = crate::process::diagnostics();
     let _ = writeln!(
         console,
-        "Processes: {} known, init-exit={}",
-        processes.process_count, processes.last_exit
+        "Processes: {} known, isolated={}, init-exit={}",
+        processes.process_count, processes.isolated_address_space, processes.last_exit
     );
     let _ = writeln!(console, "Mounts: {}", mounts.len());
     for mount in mounts {
@@ -387,20 +387,28 @@ fn kernel_diagnostics(console: &mut Console<'_>) {
 
     let user = crate::arch::user::diagnostics();
     let process = crate::process::diagnostics();
-    if process.probe_ok && user.last_cpl == 3 && process.process_count > 0 {
+    if process.probe_ok
+        && user.last_cpl == 3
+        && process.process_count > 0
+        && process.isolated_address_space
+    {
         summary.ok(
             console,
             format_args!(
-                "userspace ELF/syscall: {} process(es), CPL{}, init exit={}",
-                process.process_count, user.last_cpl, process.last_exit
+                "userspace ELF/syscall: {} process(es), CPL{}, isolated CR3={:#x}, init exit={}",
+                process.process_count, user.last_cpl, process.process_cr3, process.last_exit
             ),
         );
     } else {
         summary.fail(
             console,
             format_args!(
-                "userspace ELF/syscall invalid: ok={} processes={} cpl={}",
-                process.probe_ok, process.process_count, user.last_cpl
+                "userspace isolation invalid: ok={} processes={} cpl={} kernel-cr3={:#x} process-cr3={:#x}",
+                process.probe_ok,
+                process.process_count,
+                user.last_cpl,
+                process.kernel_cr3,
+                process.process_cr3
             ),
         );
     }
@@ -726,15 +734,15 @@ fn processes(console: &mut Console<'_>) {
             Some(code) => {
                 let _ = writeln!(
                     console,
-                    "  pid={:<3} {:<12} {:<7} entry={:#x} exit={}",
-                    process.pid, process.name, state, process.entry, code
+                    "  pid={:<3} {:<12} {:<7} entry={:#x} cr3={:#x} exit={}",
+                    process.pid, process.name, state, process.entry, process.cr3, code
                 );
             }
             None => {
                 let _ = writeln!(
                     console,
-                    "  pid={:<3} {:<12} {:<7} entry={:#x}",
-                    process.pid, process.name, state, process.entry
+                    "  pid={:<3} {:<12} {:<7} entry={:#x} cr3={:#x}",
+                    process.pid, process.name, state, process.entry, process.cr3
                 );
             }
         }

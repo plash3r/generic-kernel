@@ -41,7 +41,7 @@ prints a compact combined view of:
 runs non-destructive runtime self-checks across the active kernel. The command
 checks PMM/heap accounting, APIC/IOAPIC state, the advancing system timer,
 kernel scheduler/context switching, userspace ELF/ring3/syscall boundary,
-process table, PS/2 keyboard/mouse status, the live CR3 and supervisor write-protect bit, heap
+private process CR3 isolation/process table, PS/2 keyboard/mouse status, the live CR3 and supervisor write-protect bit, heap
 mapping and guard pages, framebuffer/font geometry, VFS/initramfs access,
 GenericFS persistence when mounted, and the Recontrol freestanding ABI.
 
@@ -74,7 +74,7 @@ See `docs/FONTS.md` for PSF2 loading details.
 These are read-only inspection commands for the current kernel state.
 `kernel tasks` lists scheduler task IDs, names, states, sleep deadlines and
 the cumulative context-switch count. `kernel processes` lists known userspace
-processes, ELF entry addresses and exit status.
+processes, ELF entry addresses, private CR3 roots and exit status.
 
 ### Machine control
 

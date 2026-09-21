@@ -1,5 +1,7 @@
 pub mod heap;
 
+pub use crate::arch::memory::AddressSpace;
+
 use bootloader_api::{info::MemoryRegionKind, BootInfo};
 use core::sync::atomic::{AtomicU64, Ordering};
 use kernel_core::{PhysicalMemory, Region, PAGE_SIZE};
@@ -156,7 +158,27 @@ pub fn runtime_diagnostics() -> Option<crate::arch::memory::RuntimeMemoryDiagnos
     ))
 }
 
+pub fn create_user_address_space() -> Result<AddressSpace, &'static str> {
+    let offset = (*PHYSICAL_MEMORY_OFFSET.lock()).ok_or("physical memory is not initialized")?;
+    let mut physical = PHYSICAL_MEMORY.lock();
+    let pmm = physical
+        .as_mut()
+        .ok_or("physical memory manager is not initialized")?;
+    crate::arch::memory::create_user_address_space(offset, pmm)
+}
+
+pub fn activate_address_space(address_space: AddressSpace) -> Result<(), &'static str> {
+    crate::arch::memory::activate_address_space(address_space)
+}
+
+pub fn active_address_space() -> AddressSpace {
+    AddressSpace {
+        root: crate::arch::memory::active_root(),
+    }
+}
+
 pub fn map_user_page(
+    address_space: AddressSpace,
     virtual_address: u64,
     writable: bool,
     executable: bool,
@@ -167,7 +189,15 @@ pub fn map_user_page(
     let pmm = physical
         .as_mut()
         .ok_or("physical memory manager is not initialized")?;
-    crate::arch::memory::map_user_page(offset, pmm, virtual_address, writable, executable, initial)
+    crate::arch::memory::map_user_page(
+        offset,
+        pmm,
+        address_space,
+        virtual_address,
+        writable,
+        executable,
+        initial,
+    )
 }
 
 pub fn stats() -> MemoryStats {

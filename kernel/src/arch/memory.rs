@@ -181,9 +181,68 @@ pub fn map_mmio<const N: usize>(
     Ok(())
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AddressSpace {
+    pub root: u64,
+}
+
+pub fn active_root() -> u64 {
+    Cr3::read().0.start_address().as_u64()
+}
+
+/// Creates a process page-table root with a private first PML4 slot for
+/// userspace and shared supervisor-only kernel mappings in all other slots.
+/// Generic currently reserves the first 512 GiB for each process.
+pub fn create_user_address_space<const N: usize>(
+    physical_memory_offset: u64,
+    pmm: &mut PhysicalMemory<N>,
+) -> Result<AddressSpace, &'static str> {
+    let kernel_root = active_root();
+    let root = pmm
+        .allocate_frame()
+        .map_err(|_| "PMM error while allocating process PML4")?
+        .ok_or("out of physical memory for process PML4")?;
+    zero_physical_frame(physical_memory_offset, root);
+
+    let kernel_user_slot = table_entry_pointer(physical_memory_offset, kernel_root, 0)?;
+    // SAFETY: kernel_user_slot addresses the live Generic PML4 through the
+    // physical direct map; volatile access avoids creating an alias to CPU state.
+    if unsafe { kernel_user_slot.read_volatile() } & 1 != 0 {
+        pmm.free_pages(root, 1)
+            .map_err(|_| "failed to release rejected process PML4")?;
+        return Err("kernel PML4[0] is occupied; private userspace layout unavailable");
+    }
+
+    for index in 1..512 {
+        let source = table_entry_pointer(physical_memory_offset, kernel_root, index)?;
+        let destination = table_entry_pointer(physical_memory_offset, root, index)?;
+        // SAFETY: source belongs to the active Generic PML4 and destination is
+        // a fresh exclusively owned PML4 frame. We deliberately leave slot 0
+        // zero so user mappings cannot inherit kernel mappings in that region.
+        let entry = unsafe { source.read_volatile() } & !(1 << 2);
+        unsafe { destination.write_volatile(entry) };
+    }
+
+    Ok(AddressSpace { root })
+}
+
+pub fn activate_address_space(address_space: AddressSpace) -> Result<(), &'static str> {
+    let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(address_space.root))
+        .map_err(|_| "process CR3 is not page aligned")?;
+    let (_, flags) = Cr3::read();
+    // SAFETY: AddressSpace roots are created from the active kernel mappings,
+    // so kernel code, stacks, interrupt state and the physical direct map stay
+    // valid across the CR3 transition.
+    unsafe {
+        Cr3::write(frame, flags);
+    }
+    Ok(())
+}
+
 pub fn map_user_page<const N: usize>(
     physical_memory_offset: u64,
     pmm: &mut PhysicalMemory<N>,
+    address_space: AddressSpace,
     virtual_address: u64,
     writable: bool,
     executable: bool,
@@ -195,11 +254,15 @@ pub fn map_user_page<const N: usize>(
     if initial.len() > PAGE_SIZE as usize {
         return Err("initial user page data exceeds one page");
     }
+    if virtual_address >= (1u64 << 39) {
+        return Err("user virtual address exceeds private process region");
+    }
 
     let physical_offset = VirtAddr::new(physical_memory_offset);
-    // SAFETY: Generic owns the active table tree and the direct map covers all
-    // page-table and newly allocated user frames.
-    let mut mapper = unsafe { current_offset_page_table(physical_offset) };
+    // SAFETY: the supplied root is a process-owned PML4 reachable through the
+    // direct map. Its first slot is private to this address space.
+    let mut mapper =
+        unsafe { offset_page_table_for_root(address_space.root, physical_offset)? };
     let page = Page::<Size4KiB>::from_start_address(VirtAddr::new(virtual_address))
         .map_err(|_| "unaligned user page")?;
     if mapper.translate_addr(page.start_address()).is_some() {
@@ -236,8 +299,9 @@ pub fn map_user_page<const N: usize>(
     }
 
     let frame = PhysFrame::<Size4KiB>::containing_address(PhysAddr::new(physical));
-    // SAFETY: the page is confirmed unmapped, the frame is uniquely allocated
-    // from PMM and USER_ACCESSIBLE is intentional for this mapping.
+    // SAFETY: the page is confirmed unmapped in this process address space,
+    // the frame is uniquely allocated from PMM, and USER_ACCESSIBLE is
+    // intentionally confined to private PML4 slot 0.
     unsafe {
         mapper
             .map_to(page, frame, flags, &mut allocator)
@@ -358,6 +422,21 @@ pub fn map_heap<const N: usize>(
     }
 }
 
+fn table_entry_pointer(
+    physical_memory_offset: u64,
+    table_physical: u64,
+    index: usize,
+) -> Result<*mut u64, &'static str> {
+    if index >= 512 || table_physical % PAGE_SIZE != 0 {
+        return Err("invalid page-table entry address");
+    }
+    let address = physical_memory_offset
+        .checked_add(table_physical)
+        .and_then(|base| base.checked_add((index * core::mem::size_of::<u64>()) as u64))
+        .ok_or("page-table direct-map address overflow")?;
+    Ok(VirtAddr::new(address).as_mut_ptr::<u64>())
+}
+
 fn zero_physical_frame(physical_memory_offset: u64, physical: u64) {
     let virtual_address = physical_memory_offset
         .checked_add(physical)
@@ -368,6 +447,23 @@ fn zero_physical_frame(physical_memory_offset: u64, physical: u64) {
     unsafe {
         core::ptr::write_bytes(ptr, 0, PAGE_SIZE as usize);
     }
+}
+
+unsafe fn offset_page_table_for_root(
+    root: u64,
+    physical_memory_offset: VirtAddr,
+) -> Result<OffsetPageTable<'static>, &'static str> {
+    let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(root))
+        .map_err(|_| "address-space root is not page aligned")?;
+    let virtual_address = physical_memory_offset + frame.start_address().as_u64();
+    let page_table_ptr: *mut PageTable = virtual_address.as_mut_ptr();
+
+    // SAFETY: caller guarantees root is a live process-owned PML4 and the
+    // physical direct map is valid for all page-table frames it references.
+    let level_4_table = unsafe { &mut *page_table_ptr };
+    // SAFETY: the direct-map offset satisfies OffsetPageTable's translation
+    // contract for every physical frame.
+    Ok(unsafe { OffsetPageTable::new(level_4_table, physical_memory_offset) })
 }
 
 unsafe fn current_offset_page_table(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
