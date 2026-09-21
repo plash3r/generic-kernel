@@ -11,6 +11,7 @@ mod initramfs;
 mod mm;
 mod recontrol;
 mod shell;
+mod task;
 mod vfs;
 
 use bootloader_api::{config::Mapping, BootInfo, BootloaderConfig};
@@ -54,6 +55,10 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
     // Discover ACPI interrupt topology, install xAPIC/IOAPIC routing, initialize
     // PS/2 event queues and start the first Generic system timer.
     arch::platform::init(info);
+    task::init();
+
+    #[cfg(feature = "smoke")]
+    task::smoke_test();
 
     x86_64::instructions::interrupts::int3();
     log!("[ok] breakpoint returned\n");

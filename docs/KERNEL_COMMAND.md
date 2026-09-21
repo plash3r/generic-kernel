@@ -12,6 +12,7 @@ command tree instead of being spread across unrelated top-level commands.
     kernel diagnostics
     kernel version
     kernel memory
+    kernel tasks
     kernel video
     kernel font ...
     kernel mounts
@@ -38,7 +39,7 @@ prints a compact combined view of:
 
 runs non-destructive runtime self-checks across the active kernel. The command
 checks PMM/heap accounting, APIC/IOAPIC state, the advancing system timer,
-PS/2 keyboard/mouse status, the live CR3 and supervisor write-protect bit, heap
+kernel scheduler/context switching, PS/2 keyboard/mouse status, the live CR3 and supervisor write-protect bit, heap
 mapping and guard pages, framebuffer/font geometry, VFS/initramfs access,
 GenericFS persistence when mounted, and the Recontrol freestanding ABI.
 
@@ -62,12 +63,15 @@ Font management is a kernel setting namespace:
 
 See `docs/FONTS.md` for PSF2 loading details.
 
-### Memory and video
+### Memory, scheduler and video
 
     kernel memory
+    kernel tasks
     kernel video
 
 These are read-only inspection commands for the current kernel state.
+`kernel tasks` lists scheduler task IDs, names, states, sleep deadlines and
+the cumulative context-switch count.
 
 ### Machine control
 

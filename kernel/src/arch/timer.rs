@@ -20,7 +20,8 @@ pub fn init() {
 }
 
 pub fn interrupt() {
-    TICKS.fetch_add(1, Ordering::Relaxed);
+    let tick = TICKS.fetch_add(1, Ordering::Relaxed).saturating_add(1);
+    crate::task::on_timer_tick(tick);
 }
 
 pub fn ticks() -> u64 {

@@ -101,6 +101,7 @@ impl Keyboard {
             if let Some(key) = self.poll_key() {
                 return key;
             }
+            crate::task::checkpoint();
             x86_64::instructions::hlt();
         }
     }

@@ -177,6 +177,8 @@ if b"[ok] Generic-owned CR3 " not in output:
     sys.exit(f"page-table ownership smoke FAILED; see build/{log_name}")
 if b"[ok] interrupt event loop + PIT timer 100 Hz" not in output:
     sys.exit(f"interrupt/timer smoke FAILED; see build/{log_name}")
+if b"[ok] scheduler context switch:" not in output:
+    sys.exit(f"scheduler smoke FAILED; see build/{log_name}")
 if b"[ok] framebuffer console smoke" not in output:
     sys.exit(f"framebuffer console smoke FAILED; see build/{log_name}")
 if args.storage and b"GenericFS" not in output:
@@ -188,9 +190,9 @@ if args.iso:
     firmware_name = "BIOS" if args.bios else "UEFI"
     print(
         f"smoke PASSED from hybrid ISO ({firmware_name}): "
-        "boot, APIC/timer, framebuffer console, physical RAM and breakpoint"
+        "boot, APIC/timer, scheduler, framebuffer console, physical RAM and breakpoint"
     )
 elif args.storage:
-    print("smoke PASSED with APIC/timer, framebuffer console and persistent virtio-blk GenericFS")
+    print("smoke PASSED with APIC/timer, scheduler, framebuffer console and persistent virtio-blk GenericFS")
 else:
-    print("smoke PASSED from disk: boot, APIC/timer, framebuffer console, physical RAM and breakpoint")
+    print("smoke PASSED from disk: boot, APIC/timer, scheduler, framebuffer console, physical RAM and breakpoint")

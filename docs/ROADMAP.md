@@ -13,7 +13,10 @@
    routing, IRQ-driven PS/2 keyboard/mouse input, a 100 Hz PIT system timer and
    monotonic tick/millisecond clock. Remaining: LAPIC/TSC timer calibration,
    richer clock sources and SMP interrupt routing.
-4. Tasks: kernel threads, preemption, SMP, per-CPU state and synchronization.
+4. Tasks — in progress: cooperative round-robin kernel threads with dedicated
+   stacks, context switching, sleeping, timer-driven reschedule requests and
+   scheduler diagnostics are working. Remaining: hard IRQ preemption, SMP,
+   per-CPU run queues/state and synchronization.
 5. Isolation: ring 3, separate address spaces, syscalls, user-pointer checking,
    ELF loader and init process.
 6. Recontrol userspace runtime: no_std Generic runtime, stable syscall ABI,

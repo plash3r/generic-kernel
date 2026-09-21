@@ -27,6 +27,8 @@ The x86_64 path provides a no_std Rust kernel with:
 - heap allocation/deallocation smoke validation;
 - ACPI RSDT/XSDT/MADT discovery with Generic-owned xAPIC/IOAPIC MMIO mappings;
 - interrupt-routed PIT 100 Hz system timer;
+- cooperative round-robin kernel scheduler with dedicated stacks, sleep/wake,
+  timer-driven reschedule requests and runtime task diagnostics;
 - interrupt-driven PS/2 keyboard and mouse event queues with wheel detection;
 - runtime-switchable framebuffer fonts: Noto Sans Mono presets plus custom PSF2 loading from VFS;
 - generated initramfs unpacked into the writable ramfs root;
@@ -46,6 +48,7 @@ A successful memory bring-up includes diagnostics similar to:
     [ok] kernel heap 2048 KiB @ 0x444400000000, 512 pages, RW+NX, guard pages
     [ok] xAPIC id=... + ... IOAPIC(s), IRQ0/1/12 routed
     [ok] interrupt event loop + PIT timer 100 Hz (... ticks)
+    [ok] scheduler context switch: ... switches, ... task(s)
     [ok] framebuffer console smoke
 
 ## Build a VirtualBox ISO
@@ -100,6 +103,7 @@ The kernel console uses one primary system namespace:
     kernel status
     kernel diagnostics
     kernel memory
+    kernel tasks
     kernel video
     kernel font list
     kernel font set noto20
@@ -186,5 +190,6 @@ The protected-memory stage still needs full kernel-section W^X enforcement and
 richer fault coverage. Graphical-shell development now lives in the separate `plash3r/generic-gui`
 repository. The kernel keeps framebuffer, input, timer and future userspace/IPC
 mechanisms, but not the desktop/window manager itself. The next kernel stages
-add scheduler/SMP, ring 3, syscalls, user ELF loading, IPC/shared memory,
+harden the scheduler with IRQ preemption/SMP, then add ring 3, syscalls,
+user ELF loading, IPC/shared memory,
 production-grade storage drivers/filesystem recovery, USB HID and networking.

@@ -47,6 +47,7 @@ pub fn run(mut console: Console<'_>) -> ! {
 
         let input = core::str::from_utf8(&line[..len]).unwrap_or("");
         execute(&mut console, &mut cwd, input);
+        crate::task::checkpoint();
     }
 }
 
@@ -177,6 +178,8 @@ fn kernel_command(console: &mut Console<'_>, cwd: &str, args: &str) {
         let _ = writeln!(console, "Generic OS kernel 0.1.0 x86_64");
     } else if subcommand.eq_ignore_ascii_case("memory") || subcommand.eq_ignore_ascii_case("mem") {
         memory(console);
+    } else if subcommand.eq_ignore_ascii_case("tasks") {
+        tasks(console);
     } else if subcommand.eq_ignore_ascii_case("video") {
         video(console);
     } else if subcommand.eq_ignore_ascii_case("font") {
@@ -205,6 +208,7 @@ fn kernel_help(console: &mut Console<'_>) {
     let _ = writeln!(console, "  DIAGNOSTICS          run kernel self-checks");
     let _ = writeln!(console, "  VERSION              kernel version");
     let _ = writeln!(console, "  MEMORY               physical memory and heap");
+    let _ = writeln!(console, "  TASKS                kernel scheduler/task state");
     let _ = writeln!(console, "  VIDEO                framebuffer information");
     let _ = writeln!(
         console,
@@ -217,6 +221,7 @@ fn kernel_help(console: &mut Console<'_>) {
     let _ = writeln!(console, "Examples:");
     let _ = writeln!(console, "  KERNEL STATUS");
     let _ = writeln!(console, "  KERNEL DIAGNOSTICS");
+    let _ = writeln!(console, "  KERNEL TASKS");
     let _ = writeln!(console, "  KERNEL FONT LIST");
     let _ = writeln!(console, "  KERNEL FONT SET noto20");
     let _ = writeln!(console, "  KERNEL FONT LOAD /mnt/fonts/custom.psf");
@@ -249,6 +254,15 @@ fn kernel_status(console: &mut Console<'_>) {
         stats.physical_total / (1024 * 1024),
         stats.physical_free / (1024 * 1024),
         stats.heap_free / 1024
+    );
+    let scheduler = crate::task::stats();
+    let _ = writeln!(
+        console,
+        "Tasks: {} total, {} running, {} sleeping, {} switches",
+        scheduler.total,
+        scheduler.running,
+        scheduler.sleeping,
+        scheduler.context_switches
     );
     let _ = writeln!(console, "Mounts: {}", mounts.len());
     for mount in mounts {
@@ -337,6 +351,27 @@ fn kernel_diagnostics(console: &mut Console<'_>) {
         );
     } else {
         summary.fail(console, format_args!("system timer is not advancing"));
+    }
+
+    let scheduler = crate::task::stats();
+    if scheduler.initialized && scheduler.total >= 2 && scheduler.context_switches > 0 {
+        summary.ok(
+            console,
+            format_args!(
+                "scheduler: {} task(s), {} context switches, kworker heartbeat={}",
+                scheduler.total, scheduler.context_switches, scheduler.heartbeat
+            ),
+        );
+    } else if scheduler.initialized {
+        summary.warn(
+            console,
+            format_args!(
+                "scheduler initialized but not yet exercised: {} task(s), {} switches",
+                scheduler.total, scheduler.context_switches
+            ),
+        );
+    } else {
+        summary.fail(console, format_args!("kernel scheduler is not initialized"));
     }
 
     match crate::arch::ps2::diagnostics() {
@@ -646,6 +681,39 @@ fn print_font(console: &mut Console<'_>) {
         console.columns(),
         console.rows()
     );
+}
+
+fn tasks(console: &mut Console<'_>) {
+    let stats = crate::task::stats();
+    let _ = writeln!(
+        console,
+        "Scheduler: {} task(s), {} context switches, heartbeat={}",
+        stats.total, stats.context_switches, stats.heartbeat
+    );
+    for task in crate::task::tasks() {
+        let state = match task.state {
+            crate::task::TaskState::Running => "running",
+            crate::task::TaskState::Ready => "ready",
+            crate::task::TaskState::Sleeping => "sleeping",
+            crate::task::TaskState::Exited => "exited",
+        };
+        match task.wake_tick {
+            Some(tick) => {
+                let _ = writeln!(
+                    console,
+                    "  #{:<3} {:<12} {:<9} wake@{}",
+                    task.id, task.name, state, tick
+                );
+            }
+            None => {
+                let _ = writeln!(
+                    console,
+                    "  #{:<3} {:<12} {}",
+                    task.id, task.name, state
+                );
+            }
+        }
+    }
 }
 
 fn memory(console: &mut Console<'_>) {
