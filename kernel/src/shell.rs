@@ -41,6 +41,7 @@ pub fn run(mut console: Console<'_>) -> ! {
                     console.write_byte(b'\n');
                     break;
                 }
+                _ => {}
             }
         }
 

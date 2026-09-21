@@ -63,10 +63,10 @@ static IDT: Lazy<InterruptDescriptorTable> = Lazy::new(|| {
             .set_stack_index(DOUBLE_FAULT_IST);
     }
 
-    idt[TIMER_VECTOR as usize].set_handler_fn(timer_interrupt);
-    idt[KEYBOARD_VECTOR as usize].set_handler_fn(keyboard_interrupt);
-    idt[MOUSE_VECTOR as usize].set_handler_fn(mouse_interrupt);
-    idt[SPURIOUS_VECTOR as usize].set_handler_fn(spurious_interrupt);
+    idt[TIMER_VECTOR].set_handler_fn(timer_interrupt);
+    idt[KEYBOARD_VECTOR].set_handler_fn(keyboard_interrupt);
+    idt[MOUSE_VECTOR].set_handler_fn(mouse_interrupt);
+    idt[SPURIOUS_VECTOR].set_handler_fn(spurious_interrupt);
     idt
 });
 
