@@ -35,7 +35,9 @@ impl HeapState {
 
     fn init(&mut self, start: usize, size: usize) {
         assert!(!self.initialized, "kernel heap initialized twice");
-        let end = start.checked_add(size).expect("kernel heap address overflow");
+        let end = start
+            .checked_add(size)
+            .expect("kernel heap address overflow");
         assert!(size > 0, "kernel heap must not be empty");
 
         self.initialized = true;
@@ -198,8 +200,7 @@ impl KernelAllocator {
     pub fn verify(&self) {
         let before = self.free_bytes();
         let small = Layout::from_size_align(37, 8).expect("valid heap smoke layout");
-        let page_aligned =
-            Layout::from_size_align(4096, 4096).expect("valid heap smoke layout");
+        let page_aligned = Layout::from_size_align(4096, 4096).expect("valid heap smoke layout");
 
         // SAFETY: these allocations are paired with deallocations using the
         // exact same layouts, and both pointers are checked for allocation failure.

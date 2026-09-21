@@ -11,8 +11,7 @@ const PMM_REGION_CAPACITY: usize = 512;
 pub const HEAP_START: u64 = 0x0000_4444_0000_0000;
 pub const HEAP_SIZE: u64 = 2 * 1024 * 1024;
 
-static PHYSICAL_MEMORY: Mutex<Option<PhysicalMemory<PMM_REGION_CAPACITY>>> =
-    Mutex::new(None);
+static PHYSICAL_MEMORY: Mutex<Option<PhysicalMemory<PMM_REGION_CAPACITY>>> = Mutex::new(None);
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct MemoryStats {
@@ -54,12 +53,8 @@ pub fn init(info: &BootInfo) {
     verify_physical_memory(physical_memory_offset, &mut pmm);
 
     let before_heap = pmm.free_bytes();
-    let mapping = crate::arch::memory::map_heap(
-        physical_memory_offset,
-        &mut pmm,
-        HEAP_START,
-        HEAP_SIZE,
-    );
+    let mapping =
+        crate::arch::memory::map_heap(physical_memory_offset, &mut pmm, HEAP_START, HEAP_SIZE);
     let consumed = before_heap - pmm.free_bytes();
     assert_eq!(
         consumed / PAGE_SIZE,

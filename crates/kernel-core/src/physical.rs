@@ -137,11 +137,7 @@ impl<const N: usize> PhysicalMemory<N> {
         Ok(None)
     }
 
-    pub fn free_pages(
-        &mut self,
-        start: u64,
-        pages: u64,
-    ) -> Result<(), PhysicalMemoryError> {
+    pub fn free_pages(&mut self, start: u64, pages: u64) -> Result<(), PhysicalMemoryError> {
         if pages == 0 || start < PAGE_SIZE || start % PAGE_SIZE != 0 {
             return Err(PhysicalMemoryError::InvalidFree);
         }
@@ -223,11 +219,7 @@ impl<const N: usize> PhysicalMemory<N> {
             .any(|region| region.start <= start && end <= region.end)
     }
 
-    fn insert_free(
-        &mut self,
-        index: usize,
-        region: Region,
-    ) -> Result<(), PhysicalMemoryError> {
+    fn insert_free(&mut self, index: usize, region: Region) -> Result<(), PhysicalMemoryError> {
         if self.free_len == N {
             return Err(PhysicalMemoryError::Capacity);
         }

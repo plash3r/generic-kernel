@@ -50,7 +50,10 @@ pub fn map_heap<const N: usize>(
 ) -> HeapMapping {
     assert_eq!(heap_start % PAGE_SIZE, 0, "heap start must be page aligned");
     assert_eq!(heap_size % PAGE_SIZE, 0, "heap size must be page aligned");
-    assert!(heap_size >= PAGE_SIZE, "heap must contain at least one page");
+    assert!(
+        heap_size >= PAGE_SIZE,
+        "heap must contain at least one page"
+    );
 
     let heap_end = heap_start
         .checked_add(heap_size)
@@ -73,8 +76,7 @@ pub fn map_heap<const N: usize>(
     }
 
     let start_page = Page::<Size4KiB>::containing_address(VirtAddr::new(heap_start));
-    let end_page =
-        Page::<Size4KiB>::containing_address(VirtAddr::new(heap_end - PAGE_SIZE));
+    let end_page = Page::<Size4KiB>::containing_address(VirtAddr::new(heap_end - PAGE_SIZE));
 
     for page in Page::range_inclusive(start_page, end_page) {
         assert!(
@@ -128,9 +130,7 @@ fn zero_physical_frame(physical_memory_offset: u64, physical: u64) {
     }
 }
 
-unsafe fn current_offset_page_table(
-    physical_memory_offset: VirtAddr,
-) -> OffsetPageTable<'static> {
+unsafe fn current_offset_page_table(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
     let (level_4_frame, _) = Cr3::read();
     let physical = level_4_frame.start_address();
     let virtual_address = physical_memory_offset + physical.as_u64();
