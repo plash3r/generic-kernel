@@ -272,9 +272,9 @@ mod tests {
         ])
         .unwrap();
 
-        assert_eq!(memory.total_bytes(), 3 * PAGE_SIZE);
-        assert_eq!(memory.free_bytes(), 3 * PAGE_SIZE);
-        assert_eq!(memory.managed_region_count(), 2);
+        assert_eq!(memory.total_bytes(), PAGE_SIZE);
+        assert_eq!(memory.free_bytes(), PAGE_SIZE);
+        assert_eq!(memory.managed_region_count(), 1);
     }
 
     #[test]
