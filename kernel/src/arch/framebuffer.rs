@@ -121,11 +121,7 @@ impl<'a> Console<'a> {
                 if self.column >= self.columns {
                     self.newline();
                 }
-                self.draw_glyph(
-                    character,
-                    self.column * CELL_WIDTH,
-                    self.row * CELL_HEIGHT,
-                );
+                self.draw_glyph(character, self.column * CELL_WIDTH, self.row * CELL_HEIGHT);
                 self.column += 1;
             }
             _ => {}
