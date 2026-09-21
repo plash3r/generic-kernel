@@ -180,6 +180,10 @@ fn kernel_command(console: &mut Console<'_>, cwd: &str, args: &str) {
         memory(console);
     } else if subcommand.eq_ignore_ascii_case("tasks") {
         tasks(console);
+    } else if subcommand.eq_ignore_ascii_case("processes")
+        || subcommand.eq_ignore_ascii_case("ps")
+    {
+        processes(console);
     } else if subcommand.eq_ignore_ascii_case("video") {
         video(console);
     } else if subcommand.eq_ignore_ascii_case("font") {
@@ -212,6 +216,7 @@ fn kernel_help(console: &mut Console<'_>) {
         console,
         "  TASKS                kernel scheduler/task state"
     );
+    let _ = writeln!(console, "  PROCESSES             userspace process table");
     let _ = writeln!(console, "  VIDEO                framebuffer information");
     let _ = writeln!(
         console,
@@ -225,6 +230,7 @@ fn kernel_help(console: &mut Console<'_>) {
     let _ = writeln!(console, "  KERNEL STATUS");
     let _ = writeln!(console, "  KERNEL DIAGNOSTICS");
     let _ = writeln!(console, "  KERNEL TASKS");
+    let _ = writeln!(console, "  KERNEL PROCESSES");
     let _ = writeln!(console, "  KERNEL FONT LIST");
     let _ = writeln!(console, "  KERNEL FONT SET noto20");
     let _ = writeln!(console, "  KERNEL FONT LOAD /mnt/fonts/custom.psf");
@@ -263,6 +269,12 @@ fn kernel_status(console: &mut Console<'_>) {
         console,
         "Tasks: {} total, {} running, {} sleeping, {} switches",
         scheduler.total, scheduler.running, scheduler.sleeping, scheduler.context_switches
+    );
+    let processes = crate::process::diagnostics();
+    let _ = writeln!(
+        console,
+        "Processes: {} known, init-exit={}",
+        processes.process_count, processes.last_exit
     );
     let _ = writeln!(console, "Mounts: {}", mounts.len());
     for mount in mounts {
@@ -375,20 +387,21 @@ fn kernel_diagnostics(console: &mut Console<'_>) {
     }
 
     let user = crate::arch::user::diagnostics();
-    if user.probe_ok && user.last_cpl == 3 {
+    let process = crate::process::diagnostics();
+    if process.probe_ok && user.last_cpl == 3 && process.process_count > 0 {
         summary.ok(
             console,
             format_args!(
-                "ring3/syscall boundary: CPL{}, last userspace ticks={}",
-                user.last_cpl, user.last_exit
+                "userspace ELF/syscall: {} process(es), CPL{}, init exit={}",
+                process.process_count, user.last_cpl, process.last_exit
             ),
         );
     } else {
         summary.fail(
             console,
             format_args!(
-                "ring3/syscall probe invalid: ok={} cpl={}",
-                user.probe_ok, user.last_cpl
+                "userspace ELF/syscall invalid: ok={} processes={} cpl={}",
+                process.probe_ok, process.process_count, user.last_cpl
             ),
         );
     }
@@ -700,6 +713,33 @@ fn print_font(console: &mut Console<'_>) {
         console.columns(),
         console.rows()
     );
+}
+
+fn processes(console: &mut Console<'_>) {
+    let items = crate::process::processes();
+    let _ = writeln!(console, "Userspace processes: {}", items.len());
+    for process in items {
+        let state = match process.state {
+            crate::process::ProcessState::Running => "running",
+            crate::process::ProcessState::Exited => "exited",
+        };
+        match process.exit_code {
+            Some(code) => {
+                let _ = writeln!(
+                    console,
+                    "  pid={:<3} {:<12} {:<7} entry={:#x} exit={}",
+                    process.pid, process.name, state, process.entry, code
+                );
+            }
+            None => {
+                let _ = writeln!(
+                    console,
+                    "  pid={:<3} {:<12} {:<7} entry={:#x}",
+                    process.pid, process.name, state, process.entry
+                );
+            }
+        }
+    }
 }
 
 fn tasks(console: &mut Console<'_>) {

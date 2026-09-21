@@ -5,11 +5,18 @@ use std::{
 };
 
 fn main() {
-    build_initramfs();
     println!("cargo:rerun-if-changed=../userspace/recontrol/kernel_probe.ll");
     println!("cargo:rerun-if-env-changed=CLANG");
+    println!("cargo:rerun-if-env-changed=LLD");
 
     let target = env::var("TARGET").expect("TARGET is set by Cargo");
+    let user_init = if target == "x86_64-unknown-none" {
+        Some(build_user_init())
+    } else {
+        None
+    };
+    build_initramfs(user_init.as_deref());
+
     if target != "x86_64-unknown-none" {
         return;
     }
@@ -46,7 +53,48 @@ fn main() {
     );
 }
 
-fn build_initramfs() {
+fn build_user_init() -> PathBuf {
+    let manifest = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("manifest dir"));
+    let source = manifest.join("../userspace/bootstrap/init.S");
+    let linker_script = manifest.join("../userspace/bootstrap/user.ld");
+    println!("cargo:rerun-if-changed={}", source.display());
+    println!("cargo:rerun-if-changed={}", linker_script.display());
+
+    let out = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR"));
+    let object = out.join("generic-init.o");
+    let elf = out.join("generic-init.elf");
+    let clang = env::var_os("CLANG").unwrap_or_else(|| "clang".into());
+    let lld = env::var_os("LLD").unwrap_or_else(|| "ld.lld".into());
+
+    let compile = Command::new(&clang)
+        .arg("-target")
+        .arg("x86_64-unknown-none")
+        .arg("-ffreestanding")
+        .arg("-fno-stack-protector")
+        .arg("-mno-red-zone")
+        .arg("-c")
+        .arg(&source)
+        .arg("-o")
+        .arg(&object)
+        .status()
+        .unwrap_or_else(|error| panic!("failed to execute {:?}: {error}", clang));
+    assert!(compile.success(), "clang failed to compile userspace init");
+
+    let link = Command::new(&lld)
+        .arg("-m")
+        .arg("elf_x86_64")
+        .arg("-T")
+        .arg(&linker_script)
+        .arg("-o")
+        .arg(&elf)
+        .arg(&object)
+        .status()
+        .unwrap_or_else(|error| panic!("failed to execute {:?}: {error}", lld));
+    assert!(link.success(), "ld.lld failed to link userspace init");
+    elf
+}
+
+fn build_initramfs(user_init: Option<&Path>) {
     let manifest = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("manifest dir"));
     let root = manifest.join("../initramfs");
     println!("cargo:rerun-if-changed={}", root.display());
@@ -54,6 +102,10 @@ fn build_initramfs() {
     let mut archive = Vec::from(&b"GIR1"[..]);
     if root.is_dir() {
         append_directory(&root, &root, &mut archive);
+    }
+    if let Some(user_init) = user_init {
+        let data = fs::read(user_init).expect("read generated userspace init ELF");
+        append_record(&mut archive, 1, "bin/init", &data);
     }
     archive.push(0);
 

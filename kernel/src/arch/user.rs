@@ -1,18 +1,15 @@
 use core::{
     arch::global_asm,
-    sync::atomic::{AtomicBool, AtomicU64, Ordering},
+    sync::atomic::{AtomicU64, Ordering},
 };
 use x86_64::VirtAddr;
 
 pub const SYS_EXIT: u64 = 0;
 pub const SYS_TICKS: u64 = 1;
 
-const USER_CODE: u64 = 0x0000_0000_0040_0000;
-const USER_STACK: u64 = 0x0000_0000_0080_0000;
 const EXIT_SENTINEL: u64 = u64::MAX;
-const ENOSYS: u64 = u64::MAX - 1;
+pub const ENOSYS: u64 = u64::MAX - 1;
 
-static PROBE_OK: AtomicBool = AtomicBool::new(false);
 static LAST_CPL: AtomicU64 = AtomicU64::new(0);
 static LAST_EXIT: AtomicU64 = AtomicU64::new(0);
 
@@ -120,7 +117,6 @@ unsafe extern "C" {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Diagnostics {
-    pub probe_ok: bool,
     pub last_cpl: u8,
     pub last_exit: u64,
 }
@@ -131,59 +127,35 @@ pub fn syscall_entry_address() -> VirtAddr {
 
 pub fn diagnostics() -> Diagnostics {
     Diagnostics {
-        probe_ok: PROBE_OK.load(Ordering::SeqCst),
         last_cpl: LAST_CPL.load(Ordering::SeqCst) as u8,
         last_exit: LAST_EXIT.load(Ordering::SeqCst),
     }
 }
 
-pub fn probe() {
-    if PROBE_OK.load(Ordering::SeqCst) {
-        return;
-    }
-
-    // mov rax, SYS_TICKS
-    // int 0x80
-    // mov rdi, rax
-    // mov rax, SYS_EXIT
-    // int 0x80
-    // ud2
-    let code: [u8; 29] = [
-        0x48, 0xb8, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xcd, 0x80, 0x48, 0x89, 0xc7,
-        0x48, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xcd, 0x80, 0x0f, 0x0b,
-    ];
-
-    crate::mm::map_user_page(USER_CODE, false, true, &code)
-        .expect("failed to map ring3 probe code");
-    crate::mm::map_user_page(USER_STACK, true, false, &[])
-        .expect("failed to map ring3 probe stack");
-
+pub fn enter(user_rip: u64, user_rsp: u64) -> u64 {
+    LAST_CPL.store(0, Ordering::SeqCst);
     let (user_cs, user_ss) = crate::arch::interrupts::user_selectors();
     let kernel_rsp_slot = core::ptr::addr_of_mut!(GENERIC_USER_KERNEL_RSP);
 
-    // SAFETY: code/stack pages are mapped USER_ACCESSIBLE with appropriate
-    // permissions; the selectors are DPL3 descriptors and TSS.RSP0 is valid.
+    // SAFETY: the process loader guarantees that RIP and RSP point into
+    // USER_ACCESSIBLE mappings. The selectors are DPL3 and TSS.RSP0 is valid.
     let exit = unsafe {
         generic_enter_user(
-            USER_CODE,
-            USER_STACK + kernel_core::PAGE_SIZE,
+            user_rip,
+            user_rsp,
             user_cs as u64,
             user_ss as u64,
             kernel_rsp_slot,
         )
     };
 
-    let cpl = LAST_CPL.load(Ordering::SeqCst);
-    assert_eq!(cpl, 3, "ring3 probe syscall did not originate at CPL3");
-    assert!(exit > 0 && exit != ENOSYS, "ring3 ticks syscall failed");
-    LAST_EXIT.store(exit, Ordering::SeqCst);
-    PROBE_OK.store(true, Ordering::SeqCst);
-
-    crate::log!(
-        "[ok] ring3 syscall probe: CPL{}, ticks={}, int 0x80 exit\n",
-        cpl,
-        exit
+    assert_eq!(
+        LAST_CPL.load(Ordering::SeqCst),
+        3,
+        "userspace syscall did not originate at CPL3"
     );
+    LAST_EXIT.store(exit, Ordering::SeqCst);
+    exit
 }
 
 #[no_mangle]
@@ -192,8 +164,8 @@ extern "C" fn generic_syscall_dispatch(number: u64, arg0: u64, caller_cs: u64) -
 
     match number {
         SYS_EXIT => {
-            // SAFETY: syscall entry runs with interrupts masked on the single
-            // bootstrap CPU. The assembly exit path immediately consumes it.
+            // SAFETY: syscall entry is an interrupt gate, so interrupts are
+            // masked while this single-CPU bootstrap syscall path updates it.
             unsafe {
                 GENERIC_USER_EXIT_CODE = arg0;
             }

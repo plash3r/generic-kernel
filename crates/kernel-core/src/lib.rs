@@ -6,6 +6,7 @@ extern crate alloc;
 extern crate std;
 
 pub mod block;
+pub mod elf;
 pub mod genericfs;
 pub mod page_tables;
 pub mod physical;

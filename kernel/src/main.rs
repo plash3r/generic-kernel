@@ -9,6 +9,7 @@ extern crate alloc;
 mod arch;
 mod initramfs;
 mod mm;
+mod process;
 mod recontrol;
 mod shell;
 mod task;
@@ -60,7 +61,7 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
     #[cfg(feature = "smoke")]
     task::smoke_test();
 
-    arch::user::probe();
+    process::init_probe();
 
     x86_64::instructions::interrupts::int3();
     log!("[ok] breakpoint returned\n");

@@ -179,8 +179,8 @@ if b"[ok] interrupt event loop + PIT timer 100 Hz" not in output:
     sys.exit(f"interrupt/timer smoke FAILED; see build/{log_name}")
 if b"[ok] scheduler context switch:" not in output:
     sys.exit(f"scheduler smoke FAILED; see build/{log_name}")
-if b"[ok] ring3 syscall probe: CPL3" not in output:
-    sys.exit(f"ring3/syscall smoke FAILED; see build/{log_name}")
+if b"[ok] userspace ELF /bin/init:" not in output or b"CPL3" not in output:
+    sys.exit(f"userspace ELF/ring3 smoke FAILED; see build/{log_name}")
 if b"[ok] framebuffer console smoke" not in output:
     sys.exit(f"framebuffer console smoke FAILED; see build/{log_name}")
 if args.storage and b"GenericFS" not in output:
@@ -192,9 +192,9 @@ if args.iso:
     firmware_name = "BIOS" if args.bios else "UEFI"
     print(
         f"smoke PASSED from hybrid ISO ({firmware_name}): "
-        "boot, APIC/timer, scheduler, ring3/syscall, framebuffer console, physical RAM and breakpoint"
+        "boot, APIC/timer, scheduler, userspace ELF/ring3, framebuffer console, physical RAM and breakpoint"
     )
 elif args.storage:
-    print("smoke PASSED with APIC/timer, scheduler, ring3/syscall, framebuffer console and persistent virtio-blk GenericFS")
+    print("smoke PASSED with APIC/timer, scheduler, userspace ELF/ring3, framebuffer console and persistent virtio-blk GenericFS")
 else:
-    print("smoke PASSED from disk: boot, APIC/timer, scheduler, ring3/syscall, framebuffer console, physical RAM and breakpoint")
+    print("smoke PASSED from disk: boot, APIC/timer, scheduler, userspace ELF/ring3, framebuffer console, physical RAM and breakpoint")

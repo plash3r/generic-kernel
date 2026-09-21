@@ -18,9 +18,11 @@
    scheduler diagnostics are working. Remaining: hard IRQ preemption, SMP,
    per-CPU run queues/state and synchronization.
 5. Isolation — in progress: DPL3 GDT segments, TSS RSP0, USER_ACCESSIBLE
-   RX/RW+NX pages and a validated int 0x80 syscall boundary are working.
-   Remaining: per-process address spaces, process lifecycle, user-pointer
-   checking beyond the probe, ELF loader and init process.
+   RX/RW+NX pages, a validated int 0x80 syscall boundary, ELF64 parser/loader
+   and a real /bin/init ELF launched from initramfs are working. A process table
+   tracks the init lifecycle. Remaining: per-process CR3/address spaces,
+   asynchronous process scheduling, robust user-pointer checking and a
+   long-lived init/userspace runtime.
 6. Recontrol userspace runtime: no_std Generic runtime, stable syscall ABI,
    process exit, byte/string output, allocation and panic path.
 7. Storage — working foundation: generic VFS, generated initramfs, block-device

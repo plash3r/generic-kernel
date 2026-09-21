@@ -30,7 +30,9 @@ The x86_64 path provides a no_std Rust kernel with:
 - cooperative round-robin kernel scheduler with dedicated stacks, sleep/wake,
   timer-driven reschedule requests and runtime task diagnostics;
 - first ring 3 boundary: user GDT/TSS state, USER_ACCESSIBLE RX/RW+NX pages and
-  an int 0x80 syscall probe that returns safely to the kernel;
+  an int 0x80 syscall path that returns safely to the kernel;
+- ELF64 userspace loader plus a generated `/bin/init` ELF in initramfs and a
+  minimal process table tracking its CPL3 execution/exit;
 - interrupt-driven PS/2 keyboard and mouse event queues with wheel detection;
 - runtime-switchable framebuffer fonts: Noto Sans Mono presets plus custom PSF2 loading from VFS;
 - generated initramfs unpacked into the writable ramfs root;
@@ -51,14 +53,14 @@ A successful memory bring-up includes diagnostics similar to:
     [ok] xAPIC id=... + ... IOAPIC(s), IRQ0/1/12 routed
     [ok] interrupt event loop + PIT timer 100 Hz (... ticks)
     [ok] scheduler context switch: ... switches, ... task(s)
-    [ok] ring3 syscall probe: CPL3, ticks=..., int 0x80 exit
+    [ok] userspace ELF /bin/init: entry=0x400000, CPL3, exit=...
     [ok] framebuffer console smoke
 
 ## Build a VirtualBox ISO
 
 On Ubuntu / WSL2 install:
 
-    sudo apt-get install build-essential clang pkg-config qemu-system-x86 ovmf python3 xorriso nasm
+    sudo apt-get install build-essential clang lld pkg-config qemu-system-x86 ovmf python3 xorriso nasm
 
 Then build:
 
@@ -107,6 +109,7 @@ The kernel console uses one primary system namespace:
     kernel diagnostics
     kernel memory
     kernel tasks
+    kernel processes
     kernel video
     kernel font list
     kernel font set noto20
@@ -193,6 +196,6 @@ The protected-memory stage still needs full kernel-section W^X enforcement and
 richer fault coverage. Graphical-shell development now lives in the separate `plash3r/generic-gui`
 repository. The kernel keeps framebuffer, input, timer and future userspace/IPC
 mechanisms, but not the desktop/window manager itself. The next kernel stages
-harden the scheduler with IRQ preemption/SMP, then turn the validated ring 3/syscall probe into isolated process address
-spaces with ELF loading, followed by IPC/shared memory,
+harden the scheduler with IRQ preemption/SMP, then give the working ELF userspace path isolated per-process CR3/address
+spaces and scheduler integration, followed by IPC/shared memory,
 production-grade storage drivers/filesystem recovery, USB HID and networking.
