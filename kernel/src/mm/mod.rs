@@ -10,7 +10,7 @@ const MAX_BOOT_REGIONS: usize = 256;
 const PMM_REGION_CAPACITY: usize = 512;
 
 pub const HEAP_START: u64 = 0x0000_4444_0000_0000;
-pub const HEAP_SIZE: u64 = 16 * 1024 * 1024;
+pub const HEAP_SIZE: u64 = 2 * 1024 * 1024;
 const MMIO_START: u64 = 0x0000_5555_0000_0000;
 static NEXT_MMIO: AtomicU64 = AtomicU64::new(MMIO_START);
 

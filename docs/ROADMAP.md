@@ -13,25 +13,19 @@
    routing, IRQ-driven PS/2 keyboard/mouse input, a 100 Hz PIT system timer and
    monotonic tick/millisecond clock. Remaining: LAPIC/TSC timer calibration,
    richer clock sources and SMP interrupt routing.
-4. GUI Phase 1 — working now: software 32-bit backbuffer, clipped drawing and
-   text primitives, dirty-region presentation, kernel-mode compositor, mouse
-   cursor, z-order/focus, draggable/minimizable/closable windows, taskbar/start
-   menu, VFS Files window, Kernel Monitor, and F12/command switching to the text
-   console. Remaining GUI architecture moves to userspace after process/IPC
-   infrastructure exists.
-5. Tasks: kernel threads, preemption, SMP, per-CPU state and synchronization.
-6. Isolation: ring 3, separate address spaces, syscalls, user-pointer checking,
+4. Tasks: kernel threads, preemption, SMP, per-CPU state and synchronization.
+5. Isolation: ring 3, separate address spaces, syscalls, user-pointer checking,
    ELF loader and init process.
-7. Recontrol userspace runtime: no_std Generic runtime, stable syscall ABI,
+6. Recontrol userspace runtime: no_std Generic runtime, stable syscall ABI,
    process exit, byte/string output, allocation and panic path.
-8. Storage — working foundation: generic VFS, generated initramfs, block-device
+7. Storage — working foundation: generic VFS, generated initramfs, block-device
    API, x86_64 legacy virtio-blk and persistent GenericFS mounted at /mnt.
    Remaining for production storage: interrupt-driven I/O, AHCI/NVMe or
    VirtIO-SCSI, journaling/fsck, permissions and page cache/writeback.
-9. User environment: shell, utilities, IPC and system services.
-10. Networking and hardware qualification: PCI, virtio-net, real devices,
+8. User environment: shell, utilities, IPC and system services.
+9. Networking and hardware qualification: PCI, virtio-net, real devices,
    fuzzing and security review.
-11. Native x128 port: define trap/privilege/MMU/atomic contracts, add a compiler
+10. Native x128 port: define trap/privilege/MMU/atomic contracts, add a compiler
     backend and replace the reference bootstrap with a full Generic kernel build.
 
 Every stage must end with an observable, reproducible acceptance test.
@@ -42,3 +36,7 @@ is kept separate from architecture-specific mechanism, early boot state is
 transitioned into long-lived subsystems, and each subsystem exposes narrow
 interfaces. Generic deliberately does not inherit Linux compatibility layers
 that are not required by its own design.
+
+Graphical-shell and compositor development is maintained separately in
+`plash3r/generic-gui`. Generic kernel will expose the process, syscall, IPC,
+shared-memory, framebuffer/display and input contracts that the GUI consumes.

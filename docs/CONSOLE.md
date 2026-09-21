@@ -1,22 +1,16 @@
 # Generic interactive console
 
-Generic has an interrupt-driven text console rendered into the boot framebuffer.
-It shares the same framebuffer and input platform as the graphical desktop.
+Generic kernel provides an interrupt-driven text console rendered into the boot
+framebuffer.
 
 Keyboard scancodes arrive through the i8042 PS/2 controller on IOAPIC-routed
-IRQ1 and are decoded from a bounded kernel queue. The mouse uses IRQ12 for the
-graphical desktop. F12 switches between the text console and the desktop without
-rebooting.
+IRQ1 and are decoded from a bounded kernel queue. Mouse events remain available
+as a kernel input mechanism for future userspace consumers, but the kernel no
+longer contains a desktop or window manager.
 
 The primary system namespace is `KERNEL`; use `kernel help` for status,
-diagnostics, desktop switching, font settings, mounts and machine control.
-Filesystem commands operate through Generic VFS and GenericFS when mounted.
-
-Useful mode-switch commands:
-
-    kernel desktop
-
-or press F12.
+diagnostics, font settings, mounts and machine control. Filesystem commands
+operate through Generic VFS and GenericFS when mounted.
 
 ## QEMU
 
@@ -29,9 +23,6 @@ Legacy BIOS:
 
     python3 scripts/run.py --iso --bios --graphical
 
-Normal framebuffer boots start in the graphical desktop. Use F12 or the
-desktop Console control to enter this text console.
-
 ## VirtualBox
 
 Build:
@@ -41,6 +32,6 @@ Build:
 Attach `build/generic.iso` as the virtual optical disc. The same hybrid ISO has
 legacy BIOS and UEFI El Torito boot entries.
 
-The current GUI input path uses the PS/2/i8042 compatibility controller. USB HID
-is a later hardware-qualification step. The x128 reference target is separate
-and is not supported by VirtualBox.
+The graphical shell is developed in the separate `plash3r/generic-gui`
+repository and will connect to Generic through userspace/syscall/IPC interfaces
+rather than being linked into the kernel.
