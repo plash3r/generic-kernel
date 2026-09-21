@@ -31,21 +31,25 @@ jobs:
           git diff --exit-code -- userspace/recontrol/kernel_probe.ll
       - name: Emulator, ISO and LLVM tools
         run: sudo apt-get update && sudo apt-get install -y clang qemu-system-x86 ovmf xorriso
-      - name: Disk boot smoke test
+      - name: UEFI disk boot smoke test
         run: |
           bash scripts/build.sh smoke
           python3 scripts/run.py --smoke
-      - name: ISO boot smoke test
-        run: |
-          bash scripts/build-iso.sh smoke
-          python3 scripts/run.py --smoke --iso
+      - name: Build hybrid ISO
+        run: bash scripts/build-iso.sh smoke
+      - name: UEFI ISO boot smoke test
+        run: python3 scripts/run.py --smoke --iso
+      - name: BIOS ISO boot smoke test
+        run: python3 scripts/run.py --smoke --iso --bios
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: boot-evidence
           path: |
             build/smoke.log
-            build/smoke-iso.log
+            build/smoke-iso-uefi.log
+            build/smoke-iso-bios.log
+            build/generic-smoke.iso
             build/generic-smoke-uefi.img
-            build/generic-smoke-uefi.iso
+            build/generic-smoke-bios.img
             build/generic-x128.img

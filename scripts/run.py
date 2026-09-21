@@ -19,41 +19,55 @@ parser.add_argument(
 parser.add_argument(
     "--iso",
     action="store_true",
-    help="boot the UEFI ISO as a virtual optical disc",
+    help="boot the hybrid ISO as a virtual optical disc",
+)
+parser.add_argument(
+    "--bios",
+    action="store_true",
+    help="use legacy BIOS instead of UEFI (ISO mode only)",
 )
 args = parser.parse_args()
+
 if args.smoke and args.debug:
     parser.error("--smoke and --debug are mutually exclusive")
 if args.smoke and args.graphical:
     parser.error("--smoke and --graphical are mutually exclusive")
+if args.bios and not args.iso:
+    parser.error("--bios currently requires --iso")
 
 qemu = shutil.which("qemu-system-x86_64")
 if not qemu:
     sys.exit("qemu-system-x86_64 not found; install QEMU")
 
-firmware = os.environ.get("OVMF_CODE")
-if not firmware:
-    firmware = next(
-        (
-            str(p)
-            for p in map(
-                Path,
-                [
-                    "/usr/share/OVMF/OVMF_CODE_4M.fd",
-                    "/usr/share/OVMF/OVMF_CODE.fd",
-                    "/usr/share/edk2/x64/OVMF_CODE.fd",
-                ],
-            )
-            if p.is_file()
-        ),
-        None,
-    )
-if not firmware or not Path(firmware).is_file():
-    sys.exit("set OVMF_CODE to an OVMF firmware file")
+firmware = None
+if not args.bios:
+    firmware = os.environ.get("OVMF_CODE")
+    if not firmware:
+        firmware = next(
+            (
+                str(p)
+                for p in map(
+                    Path,
+                    [
+                        "/usr/share/OVMF/OVMF_CODE_4M.fd",
+                        "/usr/share/OVMF/OVMF_CODE.fd",
+                        "/usr/share/edk2/x64/OVMF_CODE.fd",
+                    ],
+                )
+                if p.is_file()
+            ),
+            None,
+        )
+    if not firmware or not Path(firmware).is_file():
+        sys.exit("set OVMF_CODE to an OVMF firmware file")
 
-suffix = ".iso" if args.iso else ".img"
-stem = "generic-smoke-uefi" if args.smoke else "generic-uefi"
-image = root / "build" / f"{stem}{suffix}"
+if args.iso:
+    stem = "generic-smoke" if args.smoke else "generic"
+    image = root / "build" / f"{stem}.iso"
+else:
+    stem = "generic-smoke-uefi" if args.smoke else "generic-uefi"
+    image = root / "build" / f"{stem}.img"
+
 if not image.is_file():
     if args.iso:
         sys.exit(
@@ -77,9 +91,10 @@ cmd = [
     "256M",
     "-smp",
     "1",
-    "-drive",
-    f"if=pflash,format=raw,readonly=on,file={firmware}",
 ]
+
+if firmware is not None:
+    cmd += ["-drive", f"if=pflash,format=raw,readonly=on,file={firmware}"]
 
 if args.iso:
     cmd += ["-cdrom", str(image), "-boot", "d"]
@@ -118,10 +133,23 @@ except subprocess.TimeoutExpired as exc:
     output = exc.stdout or b""
     code = None
 
-log_name = "smoke-iso.log" if args.iso else "smoke.log"
+if args.iso and args.bios:
+    log_name = "smoke-iso-bios.log"
+elif args.iso:
+    log_name = "smoke-iso-uefi.log"
+else:
+    log_name = "smoke.log"
+
 (root / "build" / log_name).write_bytes(output)
 sys.stdout.buffer.write(output)
 if code != 33 or b"GENERIC: READY" not in output or b"GENERIC: PANIC" in output:
     sys.exit(f"smoke FAILED (QEMU exit={code}); see build/{log_name}")
-medium = "ISO" if args.iso else "disk"
-print(f"smoke PASSED from {medium}: boot, framebuffer init, physical RAM and breakpoint")
+
+if args.iso:
+    firmware_name = "BIOS" if args.bios else "UEFI"
+    print(
+        f"smoke PASSED from hybrid ISO ({firmware_name}): "
+        "boot, framebuffer init, physical RAM and breakpoint"
+    )
+else:
+    print("smoke PASSED from disk: boot, framebuffer init, physical RAM and breakpoint")

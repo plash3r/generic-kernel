@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a UEFI-bootable El Torito ISO from Generic's GPT disk image."""
+"""Create a hybrid BIOS + UEFI El Torito ISO for Generic."""
 import argparse
 from pathlib import Path
 import shutil
@@ -40,8 +40,7 @@ def find_efi_partition(image: Path) -> tuple[int, int]:
             if entry[:16] == bytes(16):
                 continue
 
-            partition_type = uuid.UUID(bytes_le=entry[:16])
-            if partition_type != EFI_SYSTEM_PARTITION:
+            if uuid.UUID(bytes_le=entry[:16]) != EFI_SYSTEM_PARTITION:
                 continue
 
             first_lba, last_lba = struct.unpack_from("<QQ", entry, 32)
@@ -69,20 +68,23 @@ def copy_range(source: Path, target: Path, offset: int, length: int) -> None:
             remaining -= len(chunk)
 
 
-def build_iso(disk_image: Path, output: Path) -> None:
+def build_iso(uefi_disk: Path, bios_disk: Path, output: Path) -> None:
     xorriso = shutil.which("xorriso")
     if not xorriso:
         raise IsoError("xorriso not found; install the xorriso package")
 
-    offset, length = find_efi_partition(disk_image)
+    offset, length = find_efi_partition(uefi_disk)
     output.parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(prefix="generic-iso-") as temp:
         root = Path(temp) / "root"
         boot = root / "boot"
         boot.mkdir(parents=True)
-        esp = boot / "efi.img"
-        copy_range(disk_image, esp, offset, length)
+
+        efi_image = boot / "efi.img"
+        bios_image = boot / "bios.img"
+        copy_range(uefi_disk, efi_image, offset, length)
+        shutil.copyfile(bios_disk, bios_image)
 
         subprocess.run(
             [
@@ -97,6 +99,10 @@ def build_iso(disk_image: Path, output: Path) -> None:
                 "GENERIC_OS",
                 "-c",
                 "boot/boot.cat",
+                "-b",
+                "boot/bios.img",
+                "-hard-disk-boot",
+                "-eltorito-alt-boot",
                 "-e",
                 "boot/efi.img",
                 "-no-emul-boot",
@@ -113,14 +119,16 @@ def build_iso(disk_image: Path, output: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("disk_image", type=Path)
+    parser.add_argument("uefi_disk", type=Path)
+    parser.add_argument("bios_disk", type=Path)
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
 
     try:
-        if not args.disk_image.is_file():
-            raise IsoError(f"disk image not found: {args.disk_image}")
-        build_iso(args.disk_image, args.output)
+        for image in (args.uefi_disk, args.bios_disk):
+            if not image.is_file():
+                raise IsoError(f"disk image not found: {image}")
+        build_iso(args.uefi_disk, args.bios_disk, args.output)
     except (IsoError, OSError, subprocess.CalledProcessError) as exc:
         print(f"generic-iso: {exc}", file=sys.stderr)
         return 1
