@@ -56,10 +56,7 @@ fn banner(console: &mut Console<'_>) {
     let _ = writeln!(console, "GENERIC OS 0.1.0");
     console.set_default_color();
     let _ = writeln!(console, "Interactive framebuffer console + VFS");
-    let _ = writeln!(
-        console,
-        "Type HELP to list commands."
-    );
+    let _ = writeln!(console, "Type HELP to list commands.");
     let _ = writeln!(console);
 }
 
