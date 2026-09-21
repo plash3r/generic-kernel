@@ -3,8 +3,7 @@ use crate::{
         apic,
         graphics::{Color, Display, Point, Rect, TextStyle},
         keyboard::{Key, Keyboard},
-        mouse,
-        timer,
+        mouse, timer,
     },
     vfs,
 };
@@ -244,12 +243,7 @@ impl Desktop {
                 _ => Color::rgb(28, 58, 94),
             };
             display.fill_rect(
-                Rect::new(
-                    center_x - radius,
-                    center_y - radius / 2,
-                    radius * 2,
-                    radius,
-                ),
+                Rect::new(center_x - radius, center_y - radius / 2, radius * 2, radius),
                 shade,
             );
         }
@@ -275,35 +269,17 @@ impl Desktop {
             TextStyle::Regular16,
         );
         draw_number(display, self.width - 70, 7, seconds, TEXT);
-        display.text(
-            self.width - 30,
-            7,
-            "s",
-            TEXT_MUTED,
-            TextStyle::Regular16,
-        );
+        display.text(self.width - 30, 7, "s", TEXT_MUTED, TextStyle::Regular16);
     }
 
     fn draw_taskbar(&self, display: &mut Display<'_>) {
         let y = self.height - TASKBAR_HEIGHT;
         display.fill_rect(Rect::new(0, y, self.width, TASKBAR_HEIGHT), PANEL);
         display.fill_rect(self.start_button(), DESKTOP_ACCENT);
-        display.text(
-            20,
-            y + 13,
-            "Generic",
-            Color::WHITE,
-            TextStyle::Bold16,
-        );
+        display.text(20, y + 13, "Generic", Color::WHITE, TextStyle::Bold16);
 
         display.fill_rect(self.console_button(), PANEL_LIGHT);
-        display.text(
-            112,
-            y + 13,
-            "Console",
-            TEXT,
-            TextStyle::Regular16,
-        );
+        display.text(112, y + 13, "Console", TEXT, TextStyle::Regular16);
 
         for (slot, index) in self.z_order.iter().copied().enumerate() {
             let window = self.windows[index];
@@ -347,13 +323,7 @@ impl Desktop {
         for (index, label) in labels.iter().enumerate() {
             let item = self.start_item(index);
             display.fill_rect(item, if index == 3 { PANEL_LIGHT } else { PANEL });
-            display.text(
-                item.x + 12,
-                item.y + 9,
-                label,
-                TEXT,
-                TextStyle::Regular16,
-            );
+            display.text(item.x + 12, item.y + 9, label, TEXT, TextStyle::Regular16);
         }
     }
 
@@ -506,14 +476,13 @@ impl Desktop {
         }
         display.line(
             Point { x, y },
-            Point { x: x + 8, y: y + 15 },
+            Point {
+                x: x + 8,
+                y: y + 15,
+            },
             Color::BLACK,
         );
-        display.line(
-            Point { x, y },
-            Point { x, y: y + 15 },
-            Color::BLACK,
-        );
+        display.line(Point { x, y }, Point { x, y: y + 15 }, Color::BLACK);
     }
 
     fn handle_mouse(&mut self, event: mouse::MouseEvent) -> Option<DesktopExit> {
@@ -527,8 +496,7 @@ impl Desktop {
         if left_now {
             if let Some((window_index, offset_x, offset_y)) = self.dragging {
                 let mut rect = self.windows[window_index].rect;
-                rect.x = (self.cursor.x - offset_x)
-                    .clamp(-rect.width + 80, self.width - 80);
+                rect.x = (self.cursor.x - offset_x).clamp(-rect.width + 80, self.width - 80);
                 rect.y = (self.cursor.y - offset_y)
                     .clamp(TOP_BAR, self.height - TASKBAR_HEIGHT - TITLE_HEIGHT);
                 self.windows[window_index].rect = rect;
@@ -618,7 +586,11 @@ impl Desktop {
     }
 
     fn bring_front(&mut self, index: usize) {
-        let Some(position) = self.z_order.iter().position(|candidate| *candidate == index) else {
+        let Some(position) = self
+            .z_order
+            .iter()
+            .position(|candidate| *candidate == index)
+        else {
             return;
         };
         for slot in position..self.z_order.len() - 1 {
@@ -663,7 +635,12 @@ impl Desktop {
 
     fn start_item(&self, index: usize) -> Rect {
         let menu = self.start_menu_rect();
-        Rect::new(menu.x + 10, menu.y + 74 + index as i32 * 34, menu.width - 20, 30)
+        Rect::new(
+            menu.x + 10,
+            menu.y + 74 + index as i32 * 34,
+            menu.width - 20,
+            30,
+        )
     }
 }
 

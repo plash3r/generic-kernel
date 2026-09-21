@@ -1,8 +1,6 @@
 use alloc::{vec, vec::Vec};
 use bootloader_api::info::{FrameBuffer, FrameBufferInfo, PixelFormat};
-use noto_sans_mono_bitmap::{
-    get_raster, get_raster_width, FontWeight, RasterHeight,
-};
+use noto_sans_mono_bitmap::{get_raster, get_raster_width, FontWeight, RasterHeight};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Point {
@@ -233,14 +231,7 @@ impl<'a> Display<'a> {
         }
     }
 
-    pub fn text(
-        &mut self,
-        mut x: i32,
-        mut y: i32,
-        text: &str,
-        color: Color,
-        style: TextStyle,
-    ) {
+    pub fn text(&mut self, mut x: i32, mut y: i32, text: &str, color: Color, style: TextStyle) {
         let start_x = x;
         let weight = style.weight();
         let height = style.height();
@@ -254,8 +245,8 @@ impl<'a> Display<'a> {
                 continue;
             }
 
-            let raster = get_raster(character, weight, height)
-                .or_else(|| get_raster('?', weight, height));
+            let raster =
+                get_raster(character, weight, height).or_else(|| get_raster('?', weight, height));
             let Some(raster) = raster else {
                 x += glyph_width;
                 continue;
@@ -295,9 +286,11 @@ impl<'a> Display<'a> {
     }
 
     pub fn checksum(&self) -> u64 {
-        self.back.iter().fold(0xcbf2_9ce4_8422_2325u64, |hash, pixel| {
-            hash.wrapping_mul(0x100_0000_01b3) ^ *pixel as u64
-        })
+        self.back
+            .iter()
+            .fold(0xcbf2_9ce4_8422_2325u64, |hash, pixel| {
+                hash.wrapping_mul(0x100_0000_01b3) ^ *pixel as u64
+            })
     }
 
     fn pixel(&mut self, x: i32, y: i32, color: Color) {

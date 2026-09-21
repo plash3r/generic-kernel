@@ -70,7 +70,10 @@ fn banner(console: &mut Console<'_>) {
     let _ = writeln!(console, "GENERIC OS 0.1.0");
     console.set_default_color();
     let _ = writeln!(console, "Interactive framebuffer console + VFS");
-    let _ = writeln!(console, "Type HELP to list commands. F12 returns to the desktop.");
+    let _ = writeln!(
+        console,
+        "Type HELP to list commands. F12 returns to the desktop."
+    );
     let _ = writeln!(console);
 }
 
@@ -217,7 +220,10 @@ fn kernel_help(console: &mut Console<'_>) {
     let _ = writeln!(console, "  HELP                 show kernel command help");
     let _ = writeln!(console, "  STATUS               combined kernel status");
     let _ = writeln!(console, "  DIAGNOSTICS          run kernel self-checks");
-    let _ = writeln!(console, "  DESKTOP              switch to graphical desktop");
+    let _ = writeln!(
+        console,
+        "  DESKTOP              switch to graphical desktop"
+    );
     let _ = writeln!(console, "  VERSION              kernel version");
     let _ = writeln!(console, "  MEMORY               physical memory and heap");
     let _ = writeln!(console, "  VIDEO                framebuffer information");
