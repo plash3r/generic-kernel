@@ -179,7 +179,7 @@ if b"[ok] interrupt event loop + PIT timer 100 Hz" not in output:
     sys.exit(f"interrupt/timer smoke FAILED; see build/{log_name}")
 if b"[ok] scheduler context switch:" not in output:
     sys.exit(f"scheduler smoke FAILED; see build/{log_name}")
-if b"[ok] process address space:" not in output or b"private user PML4[0]" not in output:
+if b"[ok] process address space:" not in output or b"private page-table tree" not in output:
     sys.exit(f"process CR3 isolation smoke FAILED; see build/{log_name}")
 if b"[ok] userspace ELF /bin/init:" not in output or b"CPL3" not in output:
     sys.exit(f"userspace ELF/ring3 smoke FAILED; see build/{log_name}")

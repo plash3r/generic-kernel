@@ -109,7 +109,7 @@ pub fn init_probe() {
 
     let user = crate::arch::user::diagnostics();
     crate::log!(
-        "[ok] process address space: kernel CR3={:#x}, pid1 CR3={:#x}, private user PML4[0]\n",
+        "[ok] process address space: kernel CR3={:#x}, pid1 CR3={:#x}, private page-table tree\n",
         kernel_space.root,
         process_space.root
     );

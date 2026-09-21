@@ -190,40 +190,39 @@ pub fn active_root() -> u64 {
     Cr3::read().0.start_address().as_u64()
 }
 
-/// Creates a process page-table root with a private first PML4 slot for
-/// userspace and shared supervisor-only kernel mappings in all other slots.
-/// Generic currently reserves the first 512 GiB for each process.
+/// Creates a fully private process page-table tree by deep-cloning the active
+/// kernel address space. Leaf physical mappings and permissions are preserved,
+/// while every page-table frame is process-owned. User mappings added later
+/// therefore cannot mutate the kernel's page-table tree.
+///
+/// This is intentionally conservative. A future optimization can share
+/// supervisor-only kernel branches once the permanent kernel virtual layout is
+/// fixed and page-table ownership/refcounting is available.
 pub fn create_user_address_space<const N: usize>(
     physical_memory_offset: u64,
     pmm: &mut PhysicalMemory<N>,
 ) -> Result<AddressSpace, &'static str> {
     let kernel_root = active_root();
-    let root = pmm
-        .allocate_frame()
-        .map_err(|_| "PMM error while allocating process PML4")?
-        .ok_or("out of physical memory for process PML4")?;
-    zero_physical_frame(physical_memory_offset, root);
+    let before = pmm.free_bytes();
+    let owned = clone_root::<16384>(
+        &mut BootTables {
+            offset: physical_memory_offset,
+            pmm,
+        },
+        kernel_root,
+    )
+    .map_err(|_| "failed to clone process page-table tree")?;
 
-    let kernel_user_slot = table_entry_pointer(physical_memory_offset, kernel_root, 0)?;
-    // SAFETY: kernel_user_slot addresses the live Generic PML4 through the
-    // physical direct map; volatile access avoids creating an alias to CPU state.
-    if unsafe { kernel_user_slot.read_volatile() } & 1 != 0 {
-        pmm.free_pages(root, 1)
-            .map_err(|_| "failed to release rejected process PML4")?;
-        return Err("kernel PML4[0] is occupied; private userspace layout unavailable");
+    let consumed = before
+        .checked_sub(pmm.free_bytes())
+        .ok_or("process page-table accounting underflow")?;
+    if consumed != owned.table_frames as u64 * PAGE_SIZE {
+        return Err("process page-table accounting mismatch");
     }
 
-    for index in 1..512 {
-        let source = table_entry_pointer(physical_memory_offset, kernel_root, index)?;
-        let destination = table_entry_pointer(physical_memory_offset, root, index)?;
-        // SAFETY: source belongs to the active Generic PML4 and destination is
-        // a fresh exclusively owned PML4 frame. We deliberately leave slot 0
-        // zero so user mappings cannot inherit kernel mappings in that region.
-        let entry = unsafe { source.read_volatile() } & !(1 << 2);
-        unsafe { destination.write_volatile(entry) };
-    }
-
-    Ok(AddressSpace { root })
+    Ok(AddressSpace {
+        root: owned.physical,
+    })
 }
 
 pub fn activate_address_space(address_space: AddressSpace) -> Result<(), &'static str> {
@@ -419,21 +418,6 @@ pub fn map_heap<const N: usize>(
         mapped_pages,
         page_table_and_heap_frames: allocator.allocated,
     }
-}
-
-fn table_entry_pointer(
-    physical_memory_offset: u64,
-    table_physical: u64,
-    index: usize,
-) -> Result<*mut u64, &'static str> {
-    if index >= 512 || table_physical % PAGE_SIZE != 0 {
-        return Err("invalid page-table entry address");
-    }
-    let address = physical_memory_offset
-        .checked_add(table_physical)
-        .and_then(|base| base.checked_add((index * core::mem::size_of::<u64>()) as u64))
-        .ok_or("page-table direct-map address overflow")?;
-    Ok(VirtAddr::new(address).as_mut_ptr::<u64>())
 }
 
 fn zero_physical_frame(physical_memory_offset: u64, physical: u64) {

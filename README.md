@@ -33,8 +33,8 @@ The x86_64 path provides a no_std Rust kernel with:
   an int 0x80 syscall path that returns safely to the kernel;
 - ELF64 userspace loader plus a generated `/bin/init` ELF in initramfs and a
   minimal process table tracking its CPL3 execution/exit;
-- per-process CR3/PML4 isolation: the first 512 GiB is private userspace while
-  supervisor-only kernel mappings are shared for syscall/interrupt entry;
+- per-process CR3 isolation with a deep-cloned private page-table tree; user
+  mappings cannot mutate the kernel's active page tables;
 - interrupt-driven PS/2 keyboard and mouse event queues with wheel detection;
 - runtime-switchable framebuffer fonts: Noto Sans Mono presets plus custom PSF2 loading from VFS;
 - generated initramfs unpacked into the writable ramfs root;
@@ -55,7 +55,7 @@ A successful memory bring-up includes diagnostics similar to:
     [ok] xAPIC id=... + ... IOAPIC(s), IRQ0/1/12 routed
     [ok] interrupt event loop + PIT timer 100 Hz (... ticks)
     [ok] scheduler context switch: ... switches, ... task(s)
-    [ok] process address space: kernel CR3=..., pid1 CR3=..., private user PML4[0]
+    [ok] process address space: kernel CR3=..., pid1 CR3=..., private page-table tree
     [ok] userspace ELF /bin/init: entry=0x400000, CPL3, exit=...
     [ok] framebuffer console smoke
 
