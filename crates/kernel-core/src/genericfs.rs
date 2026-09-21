@@ -2,7 +2,7 @@ use crate::{
     block::{BlockDevice, BlockError, SECTOR_SIZE},
     vfs::{DirEntry, FileSystem, Inode, Metadata, NodeKind, VfsError},
 };
-use alloc::{boxed::Box, string::String, vec, vec::Vec};
+use alloc::{boxed::Box, string::String, vec::Vec};
 
 const MAGIC: &[u8; 8] = b"GENFS1\0\0";
 const VERSION: u32 = 1;
@@ -501,7 +501,7 @@ fn write_u64(buffer: &mut [u8], offset: usize, value: u64) {
 mod tests {
     use super::*;
     use crate::vfs::Vfs;
-    use alloc::sync::Arc;
+    use alloc::{sync::Arc, vec};
     use std::sync::Mutex;
 
     struct SharedMemoryBlock {
