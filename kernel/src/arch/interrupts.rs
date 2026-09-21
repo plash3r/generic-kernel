@@ -45,9 +45,8 @@ static TSS: Lazy<TaskStateSegment> = Lazy::new(|| {
         VirtAddr::new(start + core::mem::size_of::<Stack>() as u64);
 
     let privilege_start = core::ptr::addr_of_mut!(PRIVILEGE_STACK) as u64;
-    tss.privilege_stack_table[0] = VirtAddr::new(
-        privilege_start + core::mem::size_of::<PrivilegeStack>() as u64,
-    );
+    tss.privilege_stack_table[0] =
+        VirtAddr::new(privilege_start + core::mem::size_of::<PrivilegeStack>() as u64);
     tss
 });
 

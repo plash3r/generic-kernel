@@ -167,14 +167,7 @@ pub fn map_user_page(
     let pmm = physical
         .as_mut()
         .ok_or("physical memory manager is not initialized")?;
-    crate::arch::memory::map_user_page(
-        offset,
-        pmm,
-        virtual_address,
-        writable,
-        executable,
-        initial,
-    )
+    crate::arch::memory::map_user_page(offset, pmm, virtual_address, writable, executable, initial)
 }
 
 pub fn stats() -> MemoryStats {
