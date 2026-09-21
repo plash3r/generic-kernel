@@ -1,12 +1,16 @@
 #![no_std]
 #![no_main]
 #![feature(abi_x86_interrupt)]
+#![feature(alloc_error_handler)]
 #![deny(unsafe_op_in_unsafe_fn)]
+
+extern crate alloc;
 
 mod arch;
 mod mm;
 mod recontrol;
 mod shell;
+mod vfs;
 
 use bootloader_api::{config::Mapping, BootInfo, BootloaderConfig};
 
@@ -34,6 +38,7 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
     // Keep generic allocation policy separate from x86_64 page-table mechanics:
     // mm owns the PMM/heap policy, arch::memory owns active page-table access.
     mm::init(info);
+    vfs::init();
 
     x86_64::instructions::interrupts::int3();
     log!("[ok] breakpoint returned\n");
@@ -72,4 +77,9 @@ fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
     arch::exit(false);
     #[cfg(not(feature = "smoke"))]
     arch::halt()
+}
+
+#[alloc_error_handler]
+fn alloc_error(layout: core::alloc::Layout) -> ! {
+    panic!("kernel allocation failed: {layout:?}")
 }

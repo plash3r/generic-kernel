@@ -25,6 +25,8 @@ The x86_64 path provides a no_std Rust kernel with:
   unmapped guard pages;
 - heap allocation/deallocation smoke validation;
 - framebuffer terminal and PS/2 keyboard input;
+- generic VFS namespace with mount routing and a writable ramfs root;
+- interactive file commands: cd/ls/cat/touch/mkdir/write/append/rm/stat/mounts;
 - freestanding Recontrol ABI integration;
 - hybrid ISO and disk boot smoke tests.
 
@@ -118,7 +120,7 @@ checks that the generated LLVM IR is reproducible.
 - kernel/ — freestanding x86_64 kernel.
 - kernel/src/mm/ — Generic memory-management policy and kernel heap.
 - kernel/src/arch/ — x86_64-specific descriptor tables, MMU, I/O and devices.
-- crates/kernel-core/ — platform-independent safe algorithms and PMM policy.
+- crates/kernel-core/ — platform-independent PMM and VFS/filesystem abstractions.
 - arch/x86/ — x86 bootstrap helpers used by optical boot.
 - arch/x128/ — x128 bootstrap source.
 - tools/x128.py — x128 assembler/reference emulator.
@@ -136,4 +138,4 @@ kernel heap, but it is not yet a complete general-purpose desktop/server OS.
 The protected-memory stage still needs Generic-owned top-level page tables,
 full kernel-section W^X enforcement and richer fault coverage. Later stages add
 APIC/IOAPIC and timekeeping, scheduler/SMP, ring 3, syscalls, user ELF loading,
-VFS/storage, mature input/graphics drivers and networking.
+persistent block storage/filesystems, mature input/graphics drivers and networking.

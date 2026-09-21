@@ -13,7 +13,9 @@
    ELF loader and init process.
 6. Recontrol userspace runtime: no_std Generic runtime, stable syscall ABI,
    process exit, byte/string output, allocation and panic path.
-7. Storage: VFS, initramfs/ramfs, virtio-blk and a persistent filesystem.
+7. Storage — in progress: generic VFS namespace, mount routing and ramfs are
+   working. Remaining: initramfs, block layer, virtio-blk and a persistent
+   filesystem.
 8. User environment: shell, utilities, IPC and system services.
 9. Networking and hardware qualification: PCI, virtio-net, real devices,
    fuzzing and security review.

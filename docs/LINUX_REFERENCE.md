@@ -67,6 +67,24 @@ in simplified form:
 A buddy allocator, per-CPU caches and NUMA policy are intentionally deferred
 until Generic actually needs their scalability.
 
+### VFS and ramfs
+
+References:
+
+- Linux: include/linux/fs.h
+- Linux: fs/namei.c
+- Linux: fs/ramfs/inode.c
+
+Linux separates pathname resolution and the VFS object model from individual
+filesystem implementations. Generic follows that boundary with a smaller
+`FileSystem` trait, inode-like IDs, a mount table and longest-prefix mount
+routing. `RamFs` is only the first backend; pathname consumers do not depend
+on its representation.
+
+Generic intentionally does not implement Linux dcache, page cache, credentials,
+security hooks or the full POSIX inode model yet. Those layers should be added
+only as processes and persistent storage require them.
+
 ### IRQ and scheduling direction
 
 References:
