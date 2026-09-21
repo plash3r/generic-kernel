@@ -91,15 +91,14 @@ impl<'a> ElfImage<'a> {
             let offset =
                 usize::try_from(read_u64(data, base + 8)?).map_err(|_| ElfError::InvalidSegment)?;
             let virtual_address = read_u64(data, base + 16)?;
-            let file_size =
-                usize::try_from(read_u64(data, base + 32)?).map_err(|_| ElfError::InvalidSegment)?;
+            let file_size = usize::try_from(read_u64(data, base + 32)?)
+                .map_err(|_| ElfError::InvalidSegment)?;
             let memory_size = read_u64(data, base + 40)?;
             let alignment = read_u64(data, base + 48)?;
 
             if memory_size < file_size as u64
                 || (alignment != 0 && !alignment.is_power_of_two())
-                || (alignment > 1
-                    && virtual_address % alignment != (offset as u64) % alignment)
+                || (alignment > 1 && virtual_address % alignment != (offset as u64) % alignment)
             {
                 return Err(ElfError::InvalidSegment);
             }
@@ -212,14 +211,20 @@ mod tests {
         let mut elf = fixture();
         let ph = 64;
         elf[ph + 32..ph + 40].copy_from_slice(&128u64.to_le_bytes());
-        assert_eq!(ElfImage::parse(&elf).unwrap_err(), ElfError::TruncatedSegment);
+        assert_eq!(
+            ElfImage::parse(&elf).unwrap_err(),
+            ElfError::TruncatedSegment
+        );
     }
 
     #[test]
     fn rejects_non_x86_64_and_bad_alignment() {
         let mut elf = fixture();
         elf[18..20].copy_from_slice(&3u16.to_le_bytes());
-        assert_eq!(ElfImage::parse(&elf).unwrap_err(), ElfError::UnsupportedMachine);
+        assert_eq!(
+            ElfImage::parse(&elf).unwrap_err(),
+            ElfError::UnsupportedMachine
+        );
 
         let mut elf = fixture();
         let ph = 64;

@@ -158,12 +158,7 @@ fn load_image(image: &ElfImage<'_>) -> Result<(), &'static str> {
                     .copy_from_slice(&segment.file_data[source_start..source_end]);
             }
 
-            crate::mm::map_user_page(
-                page_address,
-                segment.writable,
-                segment.executable,
-                &initial,
-            )?;
+            crate::mm::map_user_page(page_address, segment.writable, segment.executable, &initial)?;
             page_address += PAGE_SIZE;
         }
     }

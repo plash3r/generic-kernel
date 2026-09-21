@@ -180,8 +180,7 @@ fn kernel_command(console: &mut Console<'_>, cwd: &str, args: &str) {
         memory(console);
     } else if subcommand.eq_ignore_ascii_case("tasks") {
         tasks(console);
-    } else if subcommand.eq_ignore_ascii_case("processes")
-        || subcommand.eq_ignore_ascii_case("ps")
+    } else if subcommand.eq_ignore_ascii_case("processes") || subcommand.eq_ignore_ascii_case("ps")
     {
         processes(console);
     } else if subcommand.eq_ignore_ascii_case("video") {
