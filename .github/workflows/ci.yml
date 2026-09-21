@@ -13,7 +13,7 @@ jobs:
         run: |
           cargo fmt --all -- --check
           cargo test --locked -p kernel-core
-          python3 -m py_compile tools/x128.py scripts/run.py
+          python3 -m py_compile tools/x128.py tools/uefi_iso.py scripts/run.py
       - name: x128 reference boot
         run: |
           bash scripts/x128.sh smoke
@@ -29,17 +29,23 @@ jobs:
           cargo build --locked --manifest-path .deps/recontrol-lang/Cargo.toml -p rcl
           RCL="$PWD/.deps/recontrol-lang/target/debug/rcl" bash scripts/recontrol.sh
           git diff --exit-code -- userspace/recontrol/kernel_probe.ll
-      - name: Emulator and LLVM tools
-        run: sudo apt-get update && sudo apt-get install -y clang qemu-system-x86 ovmf
-      - name: Boot smoke test
+      - name: Emulator, ISO and LLVM tools
+        run: sudo apt-get update && sudo apt-get install -y clang qemu-system-x86 ovmf xorriso
+      - name: Disk boot smoke test
         run: |
           bash scripts/build.sh smoke
           python3 scripts/run.py --smoke
+      - name: ISO boot smoke test
+        run: |
+          bash scripts/build-iso.sh smoke
+          python3 scripts/run.py --smoke --iso
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: boot-evidence
           path: |
             build/smoke.log
+            build/smoke-iso.log
             build/generic-smoke-uefi.img
+            build/generic-smoke-uefi.iso
             build/generic-x128.img
