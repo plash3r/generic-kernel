@@ -2,7 +2,9 @@ pub mod framebuffer;
 pub mod interrupts;
 pub mod keyboard;
 pub mod memory;
+pub mod pci;
 pub mod serial;
+pub mod virtio_blk;
 
 pub fn halt() -> ! {
     x86_64::instructions::interrupts::disable();

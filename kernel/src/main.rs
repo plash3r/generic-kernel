@@ -7,6 +7,7 @@
 extern crate alloc;
 
 mod arch;
+mod initramfs;
 mod mm;
 mod recontrol;
 mod shell;
@@ -38,7 +39,19 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
     // Keep generic allocation policy separate from x86_64 page-table mechanics:
     // mm owns the PMM/heap policy, arch::memory owns active page-table access.
     mm::init(info);
-    vfs::init();
+
+    let block_device = match arch::virtio_blk::VirtioBlock::probe() {
+        Ok(Some(device)) => Some(
+            alloc::boxed::Box::new(device)
+                as alloc::boxed::Box<dyn kernel_core::block::BlockDevice>
+        ),
+        Ok(None) => None,
+        Err(error) => {
+            log!("[warn] virtio-blk initialization failed: {}\n", error);
+            None
+        }
+    };
+    vfs::init(block_device);
 
     x86_64::instructions::interrupts::int3();
     log!("[ok] breakpoint returned\n");

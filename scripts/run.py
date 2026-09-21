@@ -26,6 +26,16 @@ parser.add_argument(
     action="store_true",
     help="use legacy BIOS instead of UEFI (ISO mode only)",
 )
+parser.add_argument(
+    "--storage",
+    action="store_true",
+    help="attach build/generic-storage.img as a persistent legacy virtio-blk disk",
+)
+parser.add_argument(
+    "--expect-storage-recovered",
+    action="store_true",
+    help="smoke mode: require GenericFS to recover an existing persistent volume",
+)
 args = parser.parse_args()
 
 if args.smoke and args.debug:
@@ -34,6 +44,8 @@ if args.smoke and args.graphical:
     parser.error("--smoke and --graphical are mutually exclusive")
 if args.bios and not args.iso:
     parser.error("--bios currently requires --iso")
+if args.expect_storage_recovered and not (args.smoke and args.storage):
+    parser.error("--expect-storage-recovered requires --smoke --storage")
 
 qemu = shutil.which("qemu-system-x86_64")
 if not qemu:
@@ -99,10 +111,23 @@ if firmware is not None:
 if args.iso:
     cmd += ["-cdrom", str(image), "-boot", "d"]
 else:
-    cmd += ["-drive", f"format=raw,file={image}"]
+    boot_drive = f"format=raw,file={image}"
+    if args.storage:
+        boot_drive += ",readonly=on"
+    cmd += ["-drive", boot_drive]
+
+if args.storage:
+    storage = root / "build" / "generic-storage.img"
+    if not storage.is_file():
+        sys.exit("create persistent storage first: bash scripts/storage.sh create")
+    cmd += [
+        "-drive",
+        f"id=generic-storage,if=none,format=raw,file={storage}",
+        "-device",
+        "virtio-blk-pci,drive=generic-storage,disable-modern=on",
+    ]
 
 cmd += [
-    "-snapshot",
     "-net",
     "none",
     "-serial",
@@ -111,6 +136,8 @@ cmd += [
     "none",
     "-no-reboot",
 ]
+if not args.storage:
+    cmd += ["-snapshot"]
 
 if not args.graphical:
     cmd += ["-display", "none"]
@@ -137,6 +164,8 @@ if args.iso and args.bios:
     log_name = "smoke-iso-bios.log"
 elif args.iso:
     log_name = "smoke-iso-uefi.log"
+elif args.storage:
+    log_name = "smoke-storage.log"
 else:
     log_name = "smoke.log"
 
@@ -144,6 +173,10 @@ else:
 sys.stdout.buffer.write(output)
 if code != 33 or b"GENERIC: READY" not in output or b"GENERIC: PANIC" in output:
     sys.exit(f"smoke FAILED (QEMU exit={code}); see build/{log_name}")
+if args.storage and b"GenericFS" not in output:
+    sys.exit(f"storage smoke FAILED; see build/{log_name}")
+if args.expect_storage_recovered and b"GenericFS recovered persistent volume" not in output:
+    sys.exit(f"persistent recovery FAILED; see build/{log_name}")
 
 if args.iso:
     firmware_name = "BIOS" if args.bios else "UEFI"
@@ -151,5 +184,7 @@ if args.iso:
         f"smoke PASSED from hybrid ISO ({firmware_name}): "
         "boot, framebuffer init, physical RAM and breakpoint"
     )
+elif args.storage:
+    print("smoke PASSED with persistent virtio-blk GenericFS")
 else:
     print("smoke PASSED from disk: boot, framebuffer init, physical RAM and breakpoint")

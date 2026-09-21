@@ -12,6 +12,35 @@ pub const HEAP_START: u64 = 0x0000_4444_0000_0000;
 pub const HEAP_SIZE: u64 = 2 * 1024 * 1024;
 
 static PHYSICAL_MEMORY: Mutex<Option<PhysicalMemory<PMM_REGION_CAPACITY>>> = Mutex::new(None);
+static PHYSICAL_MEMORY_OFFSET: Mutex<Option<u64>> = Mutex::new(None);
+
+#[derive(Clone, Copy, Debug)]
+pub struct DmaRegion {
+    pub physical: u64,
+    pub virtual_address: u64,
+    pub pages: u64,
+}
+
+pub fn allocate_dma(pages: u64) -> Option<DmaRegion> {
+    if pages == 0 {
+        return None;
+    }
+    let offset = (*PHYSICAL_MEMORY_OFFSET.lock())?;
+    let mut physical = PHYSICAL_MEMORY.lock();
+    let pmm = physical.as_mut()?;
+    let start = pmm.allocate_pages(pages, 1).ok().flatten()?;
+    let virtual_address = offset.checked_add(start)?;
+    let bytes = pages.checked_mul(PAGE_SIZE)? as usize;
+    let ptr = VirtAddr::new(virtual_address).as_mut_ptr::<u8>();
+    // SAFETY: the allocated physical pages are uniquely owned by this DMA
+    // region and the bootloader direct-map covers them.
+    unsafe { core::ptr::write_bytes(ptr, 0, bytes) };
+    Some(DmaRegion {
+        physical: start,
+        virtual_address,
+        pages,
+    })
+}
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct MemoryStats {
@@ -77,6 +106,12 @@ pub fn init(info: &BootInfo) {
         HEAP_START,
         mapping.mapped_pages
     );
+
+    {
+        let mut offset = PHYSICAL_MEMORY_OFFSET.lock();
+        assert!(offset.is_none(), "physical memory offset initialized twice");
+        *offset = Some(physical_memory_offset);
+    }
 
     let mut global = PHYSICAL_MEMORY.lock();
     assert!(global.is_none(), "physical memory initialized twice");

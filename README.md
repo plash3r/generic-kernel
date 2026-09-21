@@ -25,7 +25,10 @@ The x86_64 path provides a no_std Rust kernel with:
   unmapped guard pages;
 - heap allocation/deallocation smoke validation;
 - framebuffer terminal and PS/2 keyboard input;
-- generic VFS namespace with mount routing and a writable ramfs root;
+- generated initramfs unpacked into the writable ramfs root;
+- generic VFS namespace with mount routing;
+- block-device abstraction, legacy virtio-blk PCI driver and PMM-backed DMA;
+- persistent GenericFS volume mounted at /mnt when storage is attached;
 - interactive file commands: cd/ls/cat/touch/mkdir/write/append/rm/stat/mounts;
 - freestanding Recontrol ABI integration;
 - hybrid ISO and disk boot smoke tests.
@@ -81,6 +84,22 @@ window and type HELP.
 
 Do not use the older build/generic-uefi.iso from an earlier revision; that
 image was UEFI-only.
+
+## Persistent storage
+
+Create a persistent data image:
+
+    bash scripts/storage.sh create
+
+Then boot Generic with the image attached through virtio-blk:
+
+    python3 scripts/run.py --storage --graphical
+
+Files under /mnt survive reboot. Reset the volume with:
+
+    bash scripts/storage.sh reset 16M
+
+See docs/STORAGE.md for the on-disk format and CI persistence test.
 
 ## UEFI disk image
 
@@ -138,4 +157,4 @@ kernel heap, but it is not yet a complete general-purpose desktop/server OS.
 The protected-memory stage still needs Generic-owned top-level page tables,
 full kernel-section W^X enforcement and richer fault coverage. Later stages add
 APIC/IOAPIC and timekeeping, scheduler/SMP, ring 3, syscalls, user ELF loading,
-persistent block storage/filesystems, mature input/graphics drivers and networking.
+production-grade storage drivers/filesystem recovery, mature input/graphics drivers and networking.

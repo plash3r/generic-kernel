@@ -51,6 +51,9 @@ pub enum VfsError {
     MountPointNotDirectory,
     OffsetOverflow,
     InodeExhausted,
+    Io,
+    NoSpace,
+    CorruptFilesystem,
 }
 
 impl fmt::Display for VfsError {
@@ -69,6 +72,9 @@ impl fmt::Display for VfsError {
             Self::MountPointNotDirectory => "mount point is not a directory",
             Self::OffsetOverflow => "file offset overflow",
             Self::InodeExhausted => "inode space exhausted",
+            Self::Io => "filesystem I/O error",
+            Self::NoSpace => "no space left on device",
+            Self::CorruptFilesystem => "corrupt or unsupported filesystem",
         };
         formatter.write_str(text)
     }

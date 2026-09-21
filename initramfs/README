@@ -1,0 +1,3 @@
+Generic OS initramfs
+
+This read-only boot payload seeds the in-memory root filesystem before persistent storage is mounted.

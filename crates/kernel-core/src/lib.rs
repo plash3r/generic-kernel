@@ -3,6 +3,8 @@
 
 extern crate alloc;
 
+pub mod block;
+pub mod genericfs;
 pub mod physical;
 pub mod vfs;
 pub use physical::{PhysicalMemory, PhysicalMemoryError};

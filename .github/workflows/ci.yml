@@ -35,6 +35,11 @@ jobs:
         run: |
           bash scripts/build.sh smoke
           python3 scripts/run.py --smoke
+      - name: Persistent storage smoke test
+        run: |
+          bash scripts/storage.sh reset 16M
+          python3 scripts/run.py --smoke --storage
+          python3 scripts/run.py --smoke --storage --expect-storage-recovered
       - name: Build hybrid ISO
         run: bash scripts/build-iso.sh smoke
       - name: UEFI ISO boot smoke test
@@ -47,6 +52,8 @@ jobs:
           name: boot-evidence
           path: |
             build/smoke.log
+            build/smoke-storage.log
+            build/generic-storage.img
             build/smoke-iso-uefi.log
             build/smoke-iso-bios.log
             build/generic-smoke.iso
