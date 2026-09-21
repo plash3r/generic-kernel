@@ -18,7 +18,7 @@ bootloader_api::entry_point!(kernel_main, config = &CONFIG);
 fn kernel_main(info: &'static mut BootInfo) -> ! {
     x86_64::instructions::interrupts::disable();
     arch::serial::init();
-    log!("IRON: boot\n");
+    log!("GENERIC: boot\n");
     arch::interrupts::init();
     log!("[ok] GDT / TSS / IDT\n");
     let offset = info
@@ -64,7 +64,7 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
     );
     x86_64::instructions::interrupts::int3();
     log!("[ok] breakpoint returned\n");
-    log!("IRON: READY\n");
+    log!("GENERIC: READY\n");
     // Keep this allocator's consumed-frame state when adding the next boot stages.
     // Hardware interrupts remain masked until IRQ controllers and handlers exist.
     #[cfg(feature = "smoke")]
@@ -75,7 +75,7 @@ fn kernel_main(info: &'static mut BootInfo) -> ! {
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
-    log!("IRON: PANIC: {}\n", info);
+    log!("GENERIC: PANIC: {}\n", info);
     #[cfg(feature = "smoke")]
     arch::exit(false);
     #[cfg(not(feature = "smoke"))]

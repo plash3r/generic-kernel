@@ -22,7 +22,7 @@ if not firmware:
     firmware = next((str(p) for p in map(Path, ["/usr/share/OVMF/OVMF_CODE_4M.fd", "/usr/share/OVMF/OVMF_CODE.fd", "/usr/share/edk2/x64/OVMF_CODE.fd"]) if p.is_file()), None)
 if not firmware or not Path(firmware).is_file():
     sys.exit("set OVMF_CODE to an OVMF firmware file")
-image = root / "build" / ("iron-smoke-uefi.img" if args.smoke else "iron-uefi.img")
+image = root / "build" / ("generic-smoke-uefi.img" if args.smoke else "generic-uefi.img")
 if not image.is_file():
     sys.exit("build the image first: bash scripts/build.sh " + ("smoke" if args.smoke else "normal"))
 cmd = [qemu, "-machine", "q35", "-accel", "tcg", "-cpu", "qemu64", "-m", "256M",
@@ -43,6 +43,6 @@ except subprocess.TimeoutExpired as exc:
     code = None
 (root / "build" / "smoke.log").write_bytes(output)
 sys.stdout.buffer.write(output)
-if code != 33 or b"IRON: READY" not in output or b"IRON: PANIC" in output:
+if code != 33 or b"GENERIC: READY" not in output or b"GENERIC: PANIC" in output:
     sys.exit(f"smoke FAILED (QEMU exit={code}); see build/smoke.log")
 print("smoke PASSED: boot, physical RAM write/read, returning breakpoint")

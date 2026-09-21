@@ -25,4 +25,4 @@ jobs:
           name: boot-evidence
           path: |
             build/smoke.log
-            build/iron-smoke-uefi.img
+            build/generic-smoke-uefi.img

@@ -1,5 +1,5 @@
 [package]
-name = "iron-image"
+name = "generic-image"
 version.workspace = true
 edition.workspace = true
 

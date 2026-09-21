@@ -1,5 +1,5 @@
 [package]
-name = "iron-kernel"
+name = "generic-kernel"
 version.workspace = true
 edition.workspace = true
 
@@ -13,7 +13,7 @@ kernel-core = { path = "../crates/kernel-core" }
 smoke = []
 
 [[bin]]
-name = "iron-kernel"
+name = "generic-kernel"
 path = "src/main.rs"
 test = false
 bench = false

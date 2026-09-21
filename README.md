@@ -1,9 +1,9 @@
-# Iron Kernel — основа ядра на Rust
+# Generic — основа ядра на Rust
 
 Репозиторий: [plash3r/generic-kernel](https://github.com/plash3r/generic-kernel).
-Рабочее имя ядра: Iron Kernel. Первый этап разработки собственного модульного
+Название ядра: Generic. Первый этап разработки собственного модульного
 монолитного ядра x86_64. Это ранняя основа, не готовая ОС и не production-ready ядро.
-Имя и лицензия пока не утверждены владельцем; лицензия намеренно не назначена.
+Лицензия пока не выбрана владельцем и намеренно не назначена.
 
 ## Реализовано
 
@@ -39,8 +39,8 @@ bash scripts/build.sh
 python3 scripts/run.py
 ```
 
-Вывод идёт в терминал через serial. Ожидаемая завершающая строка: `IRON: READY`.
-Остановка обычного запуска — Ctrl+C. Образ лежит в `build/iron-uefi.img`.
+Вывод идёт в терминал через serial. Ожидаемая завершающая строка: `GENERIC: READY`.
+Остановка обычного запуска — Ctrl+C. Образ лежит в `build/generic-uefi.img`.
 Если прошивка не найдена, задать `OVMF_CODE=/absolute/path/OVMF_CODE_4M.fd`.
 Запуск использует один CPU и TCG, не требует KVM, не подключает сеть и физические диски.
 
@@ -62,7 +62,7 @@ Smoke-версия выходит из QEMU через порт 0xf4. Успех
 - `scripts/` — сборка и QEMU; `docs/` — решения, план и ограничения.
 
 Для GDB собрать обычный образ и выполнить `python3 scripts/run.py --debug`.
-Подключение: `target remote localhost:1234`, ELF: `target/x86_64-unknown-none/release/iron-kernel`.
+Подключение: `target remote localhost:1234`, ELF: `target/x86_64-unknown-none/release/generic-kernel`.
 Для полноценной отладки символов добавить `debug = 2` в `[profile.release]` и пересобрать.
 
 Фактический результат проверок в этом окружении — `docs/VALIDATION.md`.
