@@ -1,8 +1,8 @@
 pub mod heap;
 
 use bootloader_api::{info::MemoryRegionKind, BootInfo};
-use kernel_core::{PhysicalMemory, Region, PAGE_SIZE};
 use core::sync::atomic::{AtomicU64, Ordering};
+use kernel_core::{PhysicalMemory, Region, PAGE_SIZE};
 use spin::Mutex;
 use x86_64::VirtAddr;
 
@@ -144,14 +144,7 @@ pub fn map_mmio(physical: u64, bytes: u64) -> Option<u64> {
 
     let mut physical_memory = PHYSICAL_MEMORY.lock();
     let pmm = physical_memory.as_mut()?;
-    crate::arch::memory::map_mmio(
-        offset,
-        pmm,
-        virtual_start,
-        physical_page,
-        pages,
-    )
-    .ok()?;
+    crate::arch::memory::map_mmio(offset, pmm, virtual_start, physical_page, pages).ok()?;
 
     virtual_start.checked_add(page_offset)
 }

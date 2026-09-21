@@ -136,10 +136,7 @@ pub fn map_mmio<const N: usize>(
     physical_start: u64,
     pages: u64,
 ) -> Result<(), &'static str> {
-    if pages == 0
-        || virtual_start % PAGE_SIZE != 0
-        || physical_start % PAGE_SIZE != 0
-    {
+    if pages == 0 || virtual_start % PAGE_SIZE != 0 || physical_start % PAGE_SIZE != 0 {
         return Err("MMIO mapping must be non-empty and page aligned");
     }
 

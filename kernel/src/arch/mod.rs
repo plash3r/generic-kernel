@@ -1,15 +1,15 @@
-pub mod timer;
-pub mod ps2;
-pub mod platform;
-pub mod mouse;
-pub mod apic;
 pub mod acpi;
+pub mod apic;
 pub mod framebuffer;
 pub mod interrupts;
 pub mod keyboard;
 pub mod memory;
+pub mod mouse;
 pub mod pci;
+pub mod platform;
+pub mod ps2;
 pub mod serial;
+pub mod timer;
 pub mod virtio_blk;
 
 pub fn halt() -> ! {

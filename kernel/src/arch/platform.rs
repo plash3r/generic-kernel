@@ -8,8 +8,8 @@ pub fn init(info: &BootInfo) {
     let physical_offset =
         crate::mm::physical_memory_offset().expect("physical direct map required for ACPI");
 
-    let apic_info =
-        crate::arch::acpi::discover_apic(rsdp, physical_offset).expect("ACPI MADT discovery failed");
+    let apic_info = crate::arch::acpi::discover_apic(rsdp, physical_offset)
+        .expect("ACPI MADT discovery failed");
     crate::arch::apic::init(&apic_info).expect("APIC/IOAPIC initialization failed");
     crate::arch::timer::init();
     let _ = crate::arch::ps2::init();

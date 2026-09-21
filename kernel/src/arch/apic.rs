@@ -150,9 +150,7 @@ fn route_isa_irq(
     let ioapic = io_apics
         .iter()
         .flatten()
-        .find(|ioapic| {
-            gsi >= ioapic.gsi_base && gsi < ioapic.gsi_base + ioapic.redirections
-        })
+        .find(|ioapic| gsi >= ioapic.gsi_base && gsi < ioapic.gsi_base + ioapic.redirections)
         .ok_or("no IOAPIC owns requested GSI")?;
 
     let mut low = vector as u32;
@@ -194,10 +192,7 @@ impl IoApic {
                 (self.virtual_address as usize + IOREGSEL) as *mut u32,
                 register as u32,
             );
-            core::ptr::write_volatile(
-                (self.virtual_address as usize + IOWIN) as *mut u32,
-                value,
-            );
+            core::ptr::write_volatile((self.virtual_address as usize + IOWIN) as *mut u32, value);
         }
     }
 
