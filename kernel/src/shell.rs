@@ -137,7 +137,10 @@ fn help(console: &mut Console<'_>) {
     let _ = writeln!(console, "  ECHO TEXT            print text");
     let _ = writeln!(console, "  UNAME / VERSION      kernel information");
     let _ = writeln!(console, "  MEM / VIDEO          memory and framebuffer");
-    let _ = writeln!(console, "  FONT ...             inspect/change/load console font");
+    let _ = writeln!(
+        console,
+        "  FONT ...             inspect/change/load console font"
+    );
     let _ = writeln!(console, "  PWD / CD PATH        current directory");
     let _ = writeln!(console, "  LS [PATH]            list directory");
     let _ = writeln!(console, "  CAT PATH             read file");
@@ -154,7 +157,6 @@ fn help(console: &mut Console<'_>) {
     let _ = writeln!(console, "  RECONTROL            call Recontrol code");
     let _ = writeln!(console, "  REBOOT / HALT        reset or stop the VM");
 }
-
 
 fn font(console: &mut Console<'_>, cwd: &str, args: &str) {
     let args = args.trim();
@@ -220,8 +222,7 @@ fn font(console: &mut Console<'_>, cwd: &str, args: &str) {
             let _ = writeln!(
                 console,
                 "font: file too large ({} bytes, max {})",
-                metadata.len,
-                MAX_CUSTOM_FONT_BYTES
+                metadata.len, MAX_CUSTOM_FONT_BYTES
             );
             return;
         }
