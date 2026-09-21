@@ -32,7 +32,8 @@ The x86_64 path provides a no_std Rust kernel with:
 - block-device abstraction, legacy virtio-blk PCI driver and PMM-backed DMA;
 - persistent GenericFS volume mounted at /mnt when storage is attached;
 - interactive file commands: cd/ls/cat/touch/mkdir/write/append/rm/stat/mounts;
-- console font commands: font list/set/load/reset;
+- centralized KERNEL system command with status/control/settings subcommands;
+- runtime font management under KERNEL FONT, including custom PSF2 loading;
 - freestanding Recontrol ABI integration;
 - hybrid ISO and disk boot smoke tests.
 
@@ -87,6 +88,24 @@ window and type HELP.
 
 Do not use the older build/generic-uefi.iso from an earlier revision; that
 image was UEFI-only.
+
+## Kernel settings and control
+
+The kernel console uses one primary system namespace:
+
+    kernel help
+    kernel status
+    kernel memory
+    kernel video
+    kernel font list
+    kernel font set noto20
+    kernel font load /mnt/fonts/custom.psf
+    kernel mounts
+    kernel reboot
+    kernel halt
+
+Older top-level system commands remain compatibility aliases, but new
+kernel-facing controls are added below `KERNEL`. See `docs/KERNEL_COMMAND.md`.
 
 ## Persistent storage
 
@@ -150,7 +169,7 @@ checks that the generated LLVM IR is reproducible.
 - userspace/recontrol/ — Recontrol source, generated IR and compiler revision.
 - tools/image/ — BIOS and UEFI disk-image builder.
 - scripts/ — build, ISO, QEMU, x128 and Recontrol commands.
-- docs/ — architecture decisions, Linux reference notes, roadmap, fonts and validation.
+- docs/ — architecture decisions, Linux reference notes, roadmap, kernel command, fonts and validation.
 
 ## Current boundary
 

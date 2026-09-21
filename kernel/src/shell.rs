@@ -72,6 +72,8 @@ fn execute(console: &mut Console<'_>, cwd: &mut String, input: &str) {
 
     if command.eq_ignore_ascii_case("help") {
         help(console);
+    } else if command.eq_ignore_ascii_case("kernel") {
+        kernel_command(console, cwd, args);
     } else if command.eq_ignore_ascii_case("clear") {
         console.clear();
     } else if command.eq_ignore_ascii_case("echo") {
@@ -83,12 +85,7 @@ fn execute(console: &mut Console<'_>, cwd: &mut String, input: &str) {
     } else if command.eq_ignore_ascii_case("mem") {
         memory(console);
     } else if command.eq_ignore_ascii_case("video") {
-        let _ = writeln!(
-            console,
-            "Framebuffer: {}x{} pixels",
-            console.width(),
-            console.height()
-        );
+        video(console);
     } else if command.eq_ignore_ascii_case("font") {
         font(console, cwd, args);
     } else if command.eq_ignore_ascii_case("recontrol") {
@@ -133,14 +130,13 @@ fn execute(console: &mut Console<'_>, cwd: &mut String, input: &str) {
 fn help(console: &mut Console<'_>) {
     let _ = writeln!(console, "Commands:");
     let _ = writeln!(console, "  HELP                 show this list");
-    let _ = writeln!(console, "  CLEAR                clear the screen");
-    let _ = writeln!(console, "  ECHO TEXT            print text");
-    let _ = writeln!(console, "  UNAME / VERSION      kernel information");
-    let _ = writeln!(console, "  MEM / VIDEO          memory and framebuffer");
     let _ = writeln!(
         console,
-        "  FONT ...             inspect/change/load console font"
+        "  KERNEL [COMMAND]     kernel settings, status and control"
     );
+    let _ = writeln!(console, "  CLEAR                clear the screen");
+    let _ = writeln!(console, "  ECHO TEXT            print text");
+    let _ = writeln!(console, "  UNAME                system information");
     let _ = writeln!(console, "  PWD / CD PATH        current directory");
     let _ = writeln!(console, "  LS [PATH]            list directory");
     let _ = writeln!(console, "  CAT PATH             read file");
@@ -153,9 +149,118 @@ fn help(console: &mut Console<'_>) {
         "  RM PATH              unlink file/empty directory"
     );
     let _ = writeln!(console, "  STAT PATH            inode/type/size");
-    let _ = writeln!(console, "  MOUNTS               mounted filesystems");
     let _ = writeln!(console, "  RECONTROL            call Recontrol code");
-    let _ = writeln!(console, "  REBOOT / HALT        reset or stop the VM");
+    let _ = writeln!(console);
+    let _ = writeln!(console, "Use KERNEL HELP for system commands.");
+}
+
+fn kernel_command(console: &mut Console<'_>, cwd: &str, args: &str) {
+    let args = args.trim();
+    if args.is_empty() || args.eq_ignore_ascii_case("help") {
+        kernel_help(console);
+        return;
+    }
+
+    let (subcommand, subargs) = args
+        .split_once(' ')
+        .map(|(command, rest)| (command, rest.trim_start()))
+        .unwrap_or((args, ""));
+
+    if subcommand.eq_ignore_ascii_case("status") {
+        kernel_status(console);
+    } else if subcommand.eq_ignore_ascii_case("version") {
+        let _ = writeln!(console, "Generic OS kernel 0.1.0 x86_64");
+    } else if subcommand.eq_ignore_ascii_case("memory")
+        || subcommand.eq_ignore_ascii_case("mem")
+    {
+        memory(console);
+    } else if subcommand.eq_ignore_ascii_case("video") {
+        video(console);
+    } else if subcommand.eq_ignore_ascii_case("font") {
+        font(console, cwd, subargs);
+    } else if subcommand.eq_ignore_ascii_case("mounts") {
+        mounts(console);
+    } else if subcommand.eq_ignore_ascii_case("reboot") {
+        let _ = writeln!(console, "Rebooting...");
+        crate::arch::reboot();
+    } else if subcommand.eq_ignore_ascii_case("halt")
+        || subcommand.eq_ignore_ascii_case("shutdown")
+    {
+        let _ = writeln!(console, "CPU halted.");
+        crate::arch::halt();
+    } else {
+        let _ = writeln!(console, "kernel: unknown subcommand: {subcommand}");
+        let _ = writeln!(console, "Use KERNEL HELP.");
+    }
+}
+
+fn kernel_help(console: &mut Console<'_>) {
+    let _ = writeln!(console, "KERNEL - Generic kernel settings and control");
+    let _ = writeln!(console, "Usage: KERNEL COMMAND [ARGS]");
+    let _ = writeln!(console);
+    let _ = writeln!(console, "  HELP                 show kernel command help");
+    let _ = writeln!(console, "  STATUS               combined kernel status");
+    let _ = writeln!(console, "  VERSION              kernel version");
+    let _ = writeln!(console, "  MEMORY               physical memory and heap");
+    let _ = writeln!(console, "  VIDEO                framebuffer information");
+    let _ = writeln!(
+        console,
+        "  FONT ...             inspect/change/load framebuffer font"
+    );
+    let _ = writeln!(console, "  MOUNTS               mounted filesystems");
+    let _ = writeln!(console, "  REBOOT               reboot the machine");
+    let _ = writeln!(console, "  HALT                 halt the CPU");
+    let _ = writeln!(console);
+    let _ = writeln!(console, "Examples:");
+    let _ = writeln!(console, "  KERNEL STATUS");
+    let _ = writeln!(console, "  KERNEL FONT LIST");
+    let _ = writeln!(console, "  KERNEL FONT SET noto20");
+    let _ = writeln!(console, "  KERNEL FONT LOAD /mnt/fonts/custom.psf");
+}
+
+fn kernel_status(console: &mut Console<'_>) {
+    let stats = crate::mm::stats();
+    let (font_width, font_height) = console.font_dimensions();
+    let mounts = crate::vfs::mounts();
+
+    let _ = writeln!(console, "Generic OS kernel 0.1.0 x86_64");
+    let _ = writeln!(
+        console,
+        "Video: {}x{} px, terminal {}x{} cells",
+        console.width(),
+        console.height(),
+        console.columns(),
+        console.rows()
+    );
+    let _ = writeln!(
+        console,
+        "Font: {} ({}x{} glyph)",
+        console.font_name(),
+        font_width,
+        font_height
+    );
+    let _ = writeln!(
+        console,
+        "Memory: {} MiB total, {} MiB free; heap {} KiB free",
+        stats.physical_total / (1024 * 1024),
+        stats.physical_free / (1024 * 1024),
+        stats.heap_free / 1024
+    );
+    let _ = writeln!(console, "Mounts: {}", mounts.len());
+    for mount in mounts {
+        let _ = writeln!(console, "  {} on {}", mount.filesystem, mount.path);
+    }
+}
+
+fn video(console: &mut Console<'_>) {
+    let _ = writeln!(
+        console,
+        "Framebuffer: {}x{} pixels; terminal grid {}x{}",
+        console.width(),
+        console.height(),
+        console.columns(),
+        console.rows()
+    );
 }
 
 fn font(console: &mut Console<'_>, cwd: &str, args: &str) {
@@ -172,7 +277,7 @@ fn font(console: &mut Console<'_>, cwd: &str, args: &str) {
         let _ = writeln!(console, "  noto24   Noto Sans Mono Regular 24 px");
         let _ = writeln!(console, "  bold16   Noto Sans Mono Bold 16 px");
         let _ = writeln!(console, "  bold20   Noto Sans Mono Bold 20 px");
-        let _ = writeln!(console, "Custom: FONT LOAD PATH.psf (PSF2)");
+        let _ = writeln!(console, "Custom: KERNEL FONT LOAD PATH.psf (PSF2)");
         return;
     }
 
@@ -191,7 +296,7 @@ fn font(console: &mut Console<'_>, cwd: &str, args: &str) {
     if action.eq_ignore_ascii_case("set") {
         let Some(preset) = FontPreset::parse(value) else {
             let _ = writeln!(console, "font: unknown preset: {value}");
-            let _ = writeln!(console, "Use FONT LIST.");
+            let _ = writeln!(console, "Use KERNEL FONT LIST.");
             return;
         };
         console.set_font_preset(preset);
@@ -202,7 +307,7 @@ fn font(console: &mut Console<'_>, cwd: &str, args: &str) {
 
     if action.eq_ignore_ascii_case("load") {
         if value.is_empty() {
-            let _ = writeln!(console, "font: usage: FONT LOAD PATH.psf");
+            let _ = writeln!(console, "font: usage: KERNEL FONT LOAD PATH.psf");
             return;
         }
 
@@ -244,7 +349,7 @@ fn font(console: &mut Console<'_>, cwd: &str, args: &str) {
         return;
     }
 
-    let _ = writeln!(console, "font: expected LIST, SET, LOAD, CURRENT or RESET");
+    let _ = writeln!(console, "font: expected LIST, SET, LOAD, CURRENT or RESET\nUse KERNEL FONT HELP via KERNEL HELP.");
 }
 
 fn print_font(console: &mut Console<'_>) {

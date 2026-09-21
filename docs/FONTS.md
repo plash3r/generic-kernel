@@ -6,14 +6,14 @@ Generic's framebuffer console supports runtime font switching.
 
 The default is `noto16`:
 
-    font
-    font list
-    font set noto16
-    font set noto20
-    font set noto24
-    font set bold16
-    font set bold20
-    font reset
+    kernel font
+    kernel font list
+    kernel font set noto16
+    kernel font set noto20
+    kernel font set noto24
+    kernel font set bold16
+    kernel font set bold20
+    kernel font reset
 
 Changing a preset immediately recalculates the console grid and clears the
 framebuffer so that wrapping, scrolling and backspace use the new cell size.
@@ -22,11 +22,11 @@ framebuffer so that wrapping, scrolling and backspace use the new cell size.
 
 Generic can load a PSF2 bitmap font directly from VFS:
 
-    font load /mnt/fonts/myfont.psf
+    kernel font load /mnt/fonts/myfont.psf
 
 or from the initramfs root:
 
-    font load /fonts/myfont.psf
+    kernel font load /fonts/myfont.psf
 
 The PSF2 parser validates the header, dimensions, glyph count, per-glyph byte
 size and backing data before the renderer switches fonts. Glyph dimensions are
